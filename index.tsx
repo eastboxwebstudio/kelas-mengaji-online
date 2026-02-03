@@ -603,7 +603,7 @@ const AdminSettings = () => {
               onChange={e => setSettings({...settings, toyyibpay_secret_key: e.target.value})}
               placeholder="Contoh: 7d6c..."
             />
-            <p className="text-xs text-gray-500 mt-1">Diperolehi dari dashboard ToyyibPay > Settings</p>
+            <p className="text-xs text-gray-500 mt-1">Diperolehi dari dashboard ToyyibPay {'>'} Settings</p>
           </div>
 
           <div>
