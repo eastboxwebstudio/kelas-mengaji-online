@@ -25,7 +25,8 @@ import {
   ShieldCheck,
   ArrowRight,
   FileText,
-  Printer
+  Printer,
+  List
 } from 'lucide-react';
 
 // --- Types & Interfaces ---
@@ -148,7 +149,7 @@ const Navbar = ({ user, onLogin, onLogout }: { user: Profile | null, onLogin: (r
             <>
               <div className="flex items-center gap-2 text-sm bg-emerald-800 py-1 px-3 rounded-full">
                 <User size={16} />
-                <span>{user.name} ({user.role})</span>
+                <span>{user.name} ({user.role === 'ustaz' ? 'Pengajar' : user.role})</span>
               </div>
               <button onClick={onLogout} className="text-emerald-100 hover:text-white p-2">
                 <LogOut size={20} />
@@ -158,13 +159,19 @@ const Navbar = ({ user, onLogin, onLogout }: { user: Profile | null, onLogin: (r
             <div className="flex gap-2">
               <button 
                 onClick={() => onLogin('student')}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-md text-sm font-medium transition"
+                className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-md text-xs sm:text-sm font-medium transition"
               >
-                Masuk Pelajar
+                Pelajar
+              </button>
+               <button 
+                onClick={() => onLogin('ustaz')}
+                className="px-3 py-2 bg-emerald-800 hover:bg-emerald-700 border border-emerald-600 rounded-md text-xs sm:text-sm font-medium transition"
+              >
+                Pengajar
               </button>
               <button 
                 onClick={() => onLogin('admin')}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-md text-sm font-medium transition"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-md text-xs sm:text-sm font-medium transition"
               >
                 Admin
               </button>
@@ -346,6 +353,228 @@ const LandingPage = ({ classes, onLogin }: { classes: ClassSession[], onLogin: (
   );
 };
 
+const InstructorDashboard = ({ 
+    user,
+    classes, 
+    enrollments 
+  }: { 
+    user: Profile,
+    classes: ClassSession[], 
+    enrollments: Enrollment[]
+  }) => {
+    const [activeTab, setActiveTab] = useState<'schedule' | 'students'>('schedule');
+
+    // Filter data for this instructor
+    const myClasses = classes.filter(c => c.instructorId === user.id);
+    const myClassIds = myClasses.map(c => c.id);
+    const myEnrollments = enrollments.filter(e => myClassIds.includes(e.classId));
+    
+    // Generate Schedule Logic
+    const getMySchedule = () => {
+      const sessions = myClasses.flatMap(c => 
+        c.sessions.map((date, idx) => ({
+          classTitle: c.title,
+          date: new Date(date),
+          link: c.googleMeetLink,
+          status: c.isActive,
+          type: c.type,
+          sessionNumber: idx + 1,
+          totalSessions: c.sessions.length
+        }))
+      );
+      return sessions.sort((a, b) => a.date.getTime() - b.date.getTime());
+    };
+  
+    const handlePrint = () => {
+      window.print();
+    };
+  
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Inject Print Styles */}
+        <style>{`
+          @media print {
+            @page { margin: 1cm; size: portrait; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background-color: white !important; }
+          }
+        `}</style>
+  
+        {/* Header - Hidden on Print */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 no-print gap-4">
+          <div>
+              <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <User className="text-emerald-600" /> Dashboard Pengajar
+              </h1>
+              <p className="text-gray-500">Selamat datang, {user.name}</p>
+          </div>
+          <div className="flex gap-2 w-full md:w-auto">
+            <button 
+               onClick={() => setActiveTab('schedule')}
+               className={`flex-1 md:flex-none px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition ${activeTab === 'schedule' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+               <Calendar size={20} /> Jadual Mengajar
+            </button>
+            <button 
+               onClick={() => setActiveTab('students')}
+               className={`flex-1 md:flex-none px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition ${activeTab === 'students' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+               <Users size={20} /> Senarai Pelajar
+            </button>
+          </div>
+        </div>
+  
+        {/* Stats Summary - Hidden on Print */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 no-print">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-emerald-100">
+                <div className="text-sm text-gray-500 mb-1">Kelas Aktif Saya</div>
+                <div className="text-3xl font-bold text-gray-800">{myClasses.filter(c => c.isActive).length}</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-emerald-100">
+                <div className="text-sm text-gray-500 mb-1">Jumlah Pelajar</div>
+                <div className="text-3xl font-bold text-gray-800">{myEnrollments.filter(e => e.status === 'Paid').length}</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-emerald-100">
+                <div className="text-sm text-gray-500 mb-1">Sesi Seterusnya</div>
+                <div className="text-lg font-bold text-emerald-600 truncate">
+                    {getMySchedule().find(s => s.date > new Date())?.date.toLocaleDateString() || '-'}
+                </div>
+            </div>
+        </div>
+  
+        {activeTab === 'schedule' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px]">
+              {/* Print Control */}
+              <div className="no-print mb-8 pb-4 border-b border-gray-100 flex justify-end">
+                 <button 
+                     onClick={handlePrint}
+                     className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 flex items-center gap-2"
+                  >
+                     <Printer size={20} /> Cetak Jadual
+                  </button>
+              </div>
+  
+              {/* Printable Area */}
+              <div id="print-area">
+                  <div className="text-center mb-8 pb-4 border-b-2 border-emerald-800">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                          <BookOpen className="text-emerald-800" size={32} />
+                          <h2 className="text-3xl font-bold font-arabic text-emerald-900">Nur Al-Quran</h2>
+                      </div>
+                      <h1 className="text-2xl font-bold text-gray-900">Jadual Pengajaran</h1>
+                      <p className="text-lg text-gray-600 mt-1">Pengajar: <span className="font-bold text-gray-900">{user.name}</span></p>
+                      <p className="text-sm text-gray-400 mt-1">Dijana pada: {new Date().toLocaleDateString('ms-MY')}</p>
+                  </div>
+  
+                  <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-300 text-left">
+                          <thead>
+                              <tr className="bg-gray-50">
+                                  <th className="py-3.5 pl-4 pr-3 text-sm font-semibold text-gray-900">Tarikh</th>
+                                  <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Masa</th>
+                                  <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Kelas / Topik</th>
+                                  <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Info Sesi</th>
+                                  <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Pautan (GMeet)</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 bg-white">
+                              {getMySchedule().length > 0 ? (
+                                  getMySchedule().map((session, idx) => (
+                                      <tr key={idx}>
+                                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
+                                              {session.date.toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                              <div className="text-xs text-gray-500 font-normal">
+                                                  {session.date.toLocaleDateString('ms-MY', { weekday: 'long' })}
+                                              </div>
+                                          </td>
+                                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                              {session.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </td>
+                                          <td className="px-3 py-4 text-sm text-gray-700">
+                                              <div className="font-medium">{session.classTitle}</div>
+                                          </td>
+                                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                              {session.type === 'monthly' ? (
+                                                  <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                                      Sesi {session.sessionNumber} / {session.totalSessions}
+                                                  </span>
+                                              ) : (
+                                                  <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                                                      Sesi Khas
+                                                  </span>
+                                              )}
+                                          </td>
+                                          <td className="px-3 py-4 text-sm text-blue-600 underline">
+                                              {session.link}
+                                          </td>
+                                      </tr>
+                                  ))
+                              ) : (
+                                  <tr>
+                                      <td colSpan={5} className="py-8 text-center text-gray-500 italic">
+                                          Tiada kelas aktif untuk anda buat masa ini.
+                                      </td>
+                                  </tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+        )}
+  
+        {activeTab === 'students' && (
+           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                   <h3 className="font-semibold text-gray-700">Senarai Pelajar Anda</h3>
+               </div>
+               <div className="overflow-x-auto">
+                   <table className="min-w-full divide-y divide-gray-200">
+                       <thead className="bg-gray-50">
+                           <tr>
+                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pelajar</th>
+                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                           </tr>
+                       </thead>
+                       <tbody className="bg-white divide-y divide-gray-200">
+                           {myEnrollments.map((enr, idx) => {
+                               const cls = classes.find(c => c.id === enr.classId);
+                               // In a real app, we would fetch student name by userId
+                               const studentName = enr.userId === 'u1' ? 'Ahmad Albab' : `Pelajar #${enr.userId.substring(0,4)}`; 
+                               
+                               return (
+                                   <tr key={idx}>
+                                       <td className="px-6 py-4 whitespace-nowrap">
+                                           <div className="flex items-center">
+                                               <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs mr-3">
+                                                   {studentName.charAt(0)}
+                                               </div>
+                                               <div className="text-sm font-medium text-gray-900">{studentName}</div>
+                                           </div>
+                                       </td>
+                                       <td className="px-6 py-4 whitespace-nowrap">
+                                           <div className="text-sm text-gray-900">{cls?.title}</div>
+                                       </td>
+                                   </tr>
+                               );
+                           })}
+                           {myEnrollments.length === 0 && (
+                               <tr>
+                                   <td colSpan={2} className="px-6 py-8 text-center text-gray-500 italic">
+                                       Belum ada pelajar yang mendaftar untuk kelas anda.
+                                   </td>
+                               </tr>
+                           )}
+                       </tbody>
+                   </table>
+               </div>
+           </div>
+        )}
+      </div>
+    );
+  };
+
 const AdminDashboard = ({ 
   classes, 
   enrollments, 
@@ -355,12 +584,8 @@ const AdminDashboard = ({
   enrollments: Enrollment[], 
   onCreateClass: (c: ClassSession) => void 
 }) => {
-  const [activeView, setActiveView] = useState<'dashboard' | 'schedules'>('dashboard');
   const [showForm, setShowForm] = useState(false);
   
-  // Schedule View State
-  const [selectedInstructorId, setSelectedInstructorId] = useState('');
-
   // Form State
   const [classType, setClassType] = useState<'single' | 'monthly'>('single');
   const [formData, setFormData] = useState({
@@ -378,10 +603,6 @@ const AdminDashboard = ({
       const cls = classes.find(c => c.id === curr.classId);
       return acc + (cls ? cls.price : 0);
     }, 0);
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -421,67 +642,16 @@ const AdminDashboard = ({
     setFormData({ title: '', description: '', startDate: '', price: '', googleMeetLink: '', instructorId: '' });
   };
 
-  // Instructor Schedule Filtering Logic
-  const getInstructorSchedule = () => {
-    if (!selectedInstructorId) return [];
-    
-    // Find all classes by this instructor
-    const instructorClasses = classes.filter(c => c.instructorId === selectedInstructorId);
-    
-    // Flatten into individual sessions
-    const sessions = instructorClasses.flatMap(c => 
-      c.sessions.map((date, idx) => ({
-        classTitle: c.title,
-        date: new Date(date),
-        link: c.googleMeetLink,
-        status: c.isActive,
-        type: c.type,
-        sessionNumber: idx + 1,
-        totalSessions: c.sessions.length
-      }))
-    );
-    
-    // Sort by date
-    return sessions.sort((a, b) => a.date.getTime() - b.date.getTime());
-  };
-
-  const selectedInstructorName = MOCK_INSTRUCTORS.find(i => i.id === selectedInstructorId)?.name;
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Inject Print Styles */}
-      <style>{`
-        @media print {
-          @page { margin: 1cm; size: portrait; }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body { background-color: white !important; }
-        }
-      `}</style>
-
-      {/* Admin Header - Hidden on Print */}
-      <div className="flex justify-between items-center mb-8 no-print">
+      {/* Admin Header */}
+      <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <LayoutDashboard className="text-emerald-600" /> Admin Dashboard
         </h1>
-        <div className="flex gap-2">
-          <button 
-             onClick={() => setActiveView('schedules')}
-             className={`px-4 py-2 rounded-lg flex items-center gap-2 transition ${activeView === 'schedules' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-          >
-             <FileText size={20} /> Jadual Pengajar
-          </button>
-          <button 
-             onClick={() => setActiveView('dashboard')}
-             className={`px-4 py-2 rounded-lg flex items-center gap-2 transition ${activeView === 'dashboard' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-          >
-             <LayoutDashboard size={20} /> Kelas & Pelajar
-          </button>
-        </div>
       </div>
 
-      {activeView === 'dashboard' ? (
-        <div className="no-print">
+      <div>
             {/* Dashboard Actions */}
             <div className="flex justify-end mb-6">
                 <button 
@@ -706,117 +876,6 @@ const AdminDashboard = ({
                 </div>
             </div>
         </div>
-      ) : (
-        /* Schedule Generator View */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px]">
-            {/* Control Panel (Hidden on Print) */}
-            <div className="no-print mb-8 pb-8 border-b border-gray-100">
-                <div className="max-w-xl">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Pengajar untuk Menjana Jadual</label>
-                    <div className="flex gap-4">
-                        <select
-                            className="block w-full rounded-md border border-gray-300 p-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            value={selectedInstructorId}
-                            onChange={(e) => setSelectedInstructorId(e.target.value)}
-                        >
-                            <option value="">-- Pilih Ustaz / Ustazah --</option>
-                            {MOCK_INSTRUCTORS.map(inst => (
-                                <option key={inst.id} value={inst.id}>{inst.name}</option>
-                            ))}
-                        </select>
-                        <button 
-                           onClick={handlePrint}
-                           disabled={!selectedInstructorId}
-                           className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                        >
-                           <Printer size={20} /> Cetak / Muat Turun PDF
-                        </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                        Pilih pengajar, kemudian klik butang "Cetak / Muat Turun". Dalam tetingkap cetakan, pilih "Save as PDF" untuk menyimpan fail.
-                    </p>
-                </div>
-            </div>
-
-            {/* Printable Area */}
-            {selectedInstructorId ? (
-                <div id="print-area">
-                    <div className="text-center mb-8 pb-4 border-b-2 border-emerald-800">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                            <BookOpen className="text-emerald-800" size={32} />
-                            <h2 className="text-3xl font-bold font-arabic text-emerald-900">Nur Al-Quran</h2>
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900">Jadual Pengajaran</h1>
-                        <p className="text-lg text-gray-600 mt-1">Pengajar: <span className="font-bold text-gray-900">{selectedInstructorName}</span></p>
-                        <p className="text-sm text-gray-400 mt-1">Dijana pada: {new Date().toLocaleDateString('ms-MY')}</p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-300 text-left">
-                            <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="py-3.5 pl-4 pr-3 text-sm font-semibold text-gray-900">Tarikh</th>
-                                    <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Masa</th>
-                                    <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Kelas / Topik</th>
-                                    <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Info Sesi</th>
-                                    <th className="px-3 py-3.5 text-sm font-semibold text-gray-900">Pautan (GMeet)</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                                {getInstructorSchedule().length > 0 ? (
-                                    getInstructorSchedule().map((session, idx) => (
-                                        <tr key={idx}>
-                                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
-                                                {session.date.toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                <div className="text-xs text-gray-500 font-normal">
-                                                    {session.date.toLocaleDateString('ms-MY', { weekday: 'long' })}
-                                                </div>
-                                            </td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                {session.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </td>
-                                            <td className="px-3 py-4 text-sm text-gray-700">
-                                                <div className="font-medium">{session.classTitle}</div>
-                                            </td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                {session.type === 'monthly' ? (
-                                                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                                                        Sesi {session.sessionNumber} / {session.totalSessions}
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
-                                                        Sesi Khas
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-4 text-sm text-blue-600 underline">
-                                                {session.link}
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">
-                                            Tiada kelas aktif ditemui untuk pengajar ini.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div className="mt-12 pt-8 border-t border-gray-200 text-center text-xs text-gray-400">
-                        <p>© Nur Al-Quran Centre. Dokumen ini adalah sulit dan untuk kegunaan dalaman sahaja.</p>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                    <FileText size={48} className="mb-4 opacity-50" />
-                    <p>Sila pilih pengajar di atas untuk memaparkan jadual.</p>
-                </div>
-            )}
-        </div>
-      )}
     </div>
   );
 };
@@ -1153,70 +1212,85 @@ const StudentPortal = ({
 };
 
 const App = () => {
-  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [classes, setClasses] = useState<ClassSession[]>(INITIAL_CLASSES);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
 
-  // Simulate Cloudflare Function: create-bill
-  const handleEnroll = (classId: string) => {
-    if (!currentUser) {
-      alert("Sila log masuk dahulu untuk mendaftar.");
-      return;
+  const handleLogin = (role: UserRole) => {
+    if (role === 'admin') {
+      setUser(MOCK_ADMIN);
+    } else if (role === 'ustaz') {
+      setUser(MOCK_INSTRUCTORS[0]);
+    } else {
+      setUser(MOCK_USER);
     }
-    const newEnrollment: Enrollment = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId: currentUser.id,
-      classId,
-      status: 'Unpaid'
-    };
-    setEnrollments([...enrollments, newEnrollment]);
-    alert("Pendaftaran berjaya dicipta. Sila buat bayaran di tab 'Pendaftaran Saya'.");
   };
 
-  // Simulate Cloudflare Function: webhook
-  const handlePay = (enrollmentId: string) => {
-    setEnrollments(prev => prev.map(e => 
-      e.id === enrollmentId 
-        ? { ...e, status: 'Paid', transactionId: 'TXN_' + Math.floor(Math.random() * 100000) } 
-        : e
-    ));
+  const handleLogout = () => {
+    setUser(null);
   };
 
   const handleCreateClass = (newClass: ClassSession) => {
-    setClasses([newClass, ...classes]);
+    setClasses([...classes, newClass]);
   };
 
-  const handleLogin = (role: UserRole) => {
-    setCurrentUser(role === 'admin' ? MOCK_ADMIN : MOCK_USER);
+  const handleEnroll = (classId: string) => {
+    if (!user) return;
+    
+    // Check if already enrolled
+    if (enrollments.some(e => e.userId === user.id && e.classId === classId)) {
+        alert("Anda sudah mendaftar untuk kelas ini.");
+        return;
+    }
+
+    const newEnrollment: Enrollment = {
+      id: Math.random().toString(36).substr(2, 9),
+      userId: user.id,
+      classId: classId,
+      status: 'Unpaid'
+    };
+    setEnrollments([...enrollments, newEnrollment]);
+  };
+
+  const handlePay = (enrollmentId: string) => {
+    setEnrollments(enrollments.map(e => 
+      e.id === enrollmentId ? { ...e, status: 'Paid' } : e
+    ));
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <Navbar 
-        user={currentUser} 
-        onLogin={handleLogin} 
-        onLogout={() => setCurrentUser(null)} 
-      />
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <Navbar user={user} onLogin={handleLogin} onLogout={handleLogout} />
       
-      <main className="flex-1">
-        {!currentUser ? (
-          <LandingPage classes={classes} onLogin={handleLogin} />
-        ) : currentUser.role === 'admin' ? (
-          <AdminDashboard 
-            classes={classes} 
-            enrollments={enrollments} 
-            onCreateClass={handleCreateClass} 
-          />
-        ) : (
-          <StudentPortal 
-            user={currentUser} 
-            classes={classes} 
-            enrollments={enrollments}
-            onEnroll={handleEnroll}
-            onPay={handlePay}
-          />
-        )}
-      </main>
+      {!user && (
+        <LandingPage classes={classes} onLogin={handleLogin} />
+      )}
+
+      {user && user.role === 'admin' && (
+        <AdminDashboard 
+          classes={classes} 
+          enrollments={enrollments} 
+          onCreateClass={handleCreateClass} 
+        />
+      )}
+
+      {user && user.role === 'ustaz' && (
+        <InstructorDashboard 
+          user={user}
+          classes={classes} 
+          enrollments={enrollments} 
+        />
+      )}
+
+      {user && user.role === 'student' && (
+        <StudentPortal 
+          user={user} 
+          classes={classes} 
+          enrollments={enrollments} 
+          onEnroll={handleEnroll}
+          onPay={handlePay}
+        />
+      )}
     </div>
   );
 };
