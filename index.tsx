@@ -86,7 +86,7 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
   <nav className="bg-emerald-900 text-white shadow-lg sticky top-0 z-50 print:hidden">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between h-16 items-center">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
           <BookOpen className="h-8 w-8 text-emerald-400" />
           <span className="font-bold text-xl font-arabic tracking-wider">Nur Al-Quran</span>
         </div>
@@ -554,6 +554,11 @@ const AdminSettings = () => {
       .select('key, value')
       .in('key', ['toyyibpay_secret_key', 'toyyibpay_category_code']);
 
+    if (error) {
+       console.error("Error fetching settings:", error);
+       // Don't show alert here to avoid annoying popups on load if table empty
+    }
+
     if (data) {
       const mapped = data.reduce((acc: any, curr) => {
         acc[curr.key] = curr.value;
@@ -568,20 +573,29 @@ const AdminSettings = () => {
     e.preventDefault();
     setSaving(true);
     
-    // Upsert items one by one or bulk
-    const updates = [
-      { key: 'toyyibpay_secret_key', value: settings.toyyibpay_secret_key },
-      { key: 'toyyibpay_category_code', value: settings.toyyibpay_category_code }
-    ];
+    try {
+        // Upsert items one by one or bulk
+        const updates = [
+          { key: 'toyyibpay_secret_key', value: settings.toyyibpay_secret_key },
+          { key: 'toyyibpay_category_code', value: settings.toyyibpay_category_code }
+        ];
 
-    const { error } = await supabase
-      .from('app_settings')
-      .upsert(updates);
+        const { error } = await supabase
+          .from('app_settings')
+          .upsert(updates);
 
-    if (error) alert('Gagal menyimpan tetapan: ' + error.message);
-    else alert('Tetapan berjaya disimpan!');
-    
-    setSaving(false);
+        if (error) {
+            console.error(error);
+            alert('Gagal menyimpan tetapan: ' + error.message + '. Pastikan anda adalah ADMIN dan table "app_settings" wujud.');
+        } else {
+            alert('Tetapan berjaya disimpan!');
+        }
+    } catch (err: any) {
+        console.error("Unexpected error:", err);
+        alert("Ralat tidak dijangka: " + err.message);
+    } finally {
+        setSaving(false);
+    }
   };
 
   return (
@@ -857,18 +871,23 @@ const App = () => {
   // --- 1. Fetch Auth Session & Profile ---
   useEffect(() => {
     const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            // Fetch profile data
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-            
-            if (profile) setUser(profile);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                // Fetch profile data
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+                
+                if (profile) setUser(profile);
+            }
+        } catch (error) {
+            console.error("Session check error:", error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
     checkSession();
 
@@ -879,6 +898,7 @@ const App = () => {
         } else {
             setUser(null);
         }
+        setLoading(false); // Ensure loading stops on state change
     });
 
     return () => subscription.unsubscribe();
@@ -932,11 +952,16 @@ const App = () => {
 
     try {
         await supabase.auth.signOut();
+        // Clear local state immediately to update UI
+        setUser(null);
+        // Force redirect to home to clear any lingering states, 
+        // safer than reload() which might re-trigger auth checks in a loop
+        window.location.href = '/'; 
     } catch (error) {
         console.error("Logout error:", error);
-    } finally {
+        // Even if error, force UI clear
         setUser(null);
-        window.location.reload(); // Paksa refresh untuk bersihkan state
+        window.location.href = '/';
     }
   };
 
