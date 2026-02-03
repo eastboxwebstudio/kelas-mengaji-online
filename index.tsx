@@ -99,8 +99,12 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
                 <span className="text-emerald-300 text-xs font-bold uppercase">({user.role === 'ustaz' ? 'Pengajar' : user.role})</span>
               </div>
               <button 
-                onClick={onLogout} 
-                className="text-emerald-100 hover:text-white hover:bg-emerald-800 p-2 rounded-full transition"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onLogout();
+                }} 
+                className="text-emerald-100 hover:text-white hover:bg-emerald-800 p-2 rounded-full transition flex items-center justify-center"
                 title="Log Keluar"
               >
                 <LogOut size={20} />
@@ -924,9 +928,15 @@ const App = () => {
   }, [user]); // Re-fetch when user logs in
 
   const handleLogout = async () => {
-    if(window.confirm("Log keluar?")) {
+    if(!window.confirm("Adakah anda pasti ingin log keluar?")) return;
+
+    try {
         await supabase.auth.signOut();
+    } catch (error) {
+        console.error("Logout error:", error);
+    } finally {
         setUser(null);
+        window.location.reload(); // Paksa refresh untuk bersihkan state
     }
   };
 
