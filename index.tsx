@@ -948,20 +948,17 @@ const App = () => {
   }, [user]); // Re-fetch when user logs in
 
   const handleLogout = async () => {
-    if(!window.confirm("Adakah anda pasti ingin log keluar?")) return;
+    // 1. Optimistic UI update: Clear user immediately
+    setUser(null);
 
     try {
+        // 2. Perform Supabase logout
         await supabase.auth.signOut();
-        // Clear local state immediately to update UI
-        setUser(null);
-        // Force redirect to home to clear any lingering states, 
-        // safer than reload() which might re-trigger auth checks in a loop
-        window.location.href = '/'; 
     } catch (error) {
         console.error("Logout error:", error);
-        // Even if error, force UI clear
-        setUser(null);
-        window.location.href = '/';
+    } finally {
+        // 3. Force hard refresh/redirect to ensure clean state
+        window.location.href = '/'; 
     }
   };
 
