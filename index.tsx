@@ -113,7 +113,7 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
       <div className="flex justify-between h-16 items-center">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
           <BookOpen className="h-8 w-8 text-emerald-400" />
-          <span className="font-bold text-xl font-arabic tracking-wider">Nur Al-Quran</span>
+          <span className="font-bold text-xl font-arabic tracking-wider">CelikKalam</span>
         </div>
         <div className="flex items-center gap-4">
           {user ? (
@@ -219,7 +219,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in-up">
         <div className="bg-emerald-800 p-6 text-center text-white relative">
-            <h2 className="text-2xl font-bold font-arabic">Nur Al-Quran</h2>
+            <h2 className="text-2xl font-bold font-arabic">CelikKalam</h2>
             <p className="text-emerald-200 text-sm">{isRegistering ? 'Daftar Akaun Baru' : 'Selamat Kembali'}</p>
             <button onClick={onClose} className="absolute top-4 right-4 text-emerald-200 hover:text-white"><XCircle/></button>
         </div>
@@ -317,7 +317,7 @@ const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenA
       <div className="py-24 bg-emerald-50">
         <div className="max-w-7xl mx-auto px-4">
             <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-arabic">Kenapa Pilih Nur Al-Quran?</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-arabic">Kenapa Pilih CelikKalam?</h2>
                 <p className="text-gray-600 max-w-2xl mx-auto text-lg">Kami komited menyediakan pendidikan Al-Quran berkualiti tinggi yang sesuai dengan gaya hidup moden anda, tanpa mengabaikan tradisi ilmu.</p>
             </div>
             
@@ -995,7 +995,7 @@ const App = () => {
       {/* Footer / Debug Info */}
       <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
          <div className="max-w-7xl mx-auto px-4">
-            <p className="font-semibold text-emerald-900 mb-2">Nur Al-Quran Digital</p>
+            <p className="font-semibold text-emerald-900 mb-2">CelikKalam Digital</p>
             <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi Google Sheets Database.</p>
          </div>
       </div>
