@@ -22,7 +22,9 @@ import {
   Calendar,
   Clock,
   Eye,
-  EyeOff
+  EyeOff,
+  Wand2,
+  Check
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -280,46 +282,173 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
 
 const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenAuth: () => void }) => {
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="bg-emerald-900 py-20 px-4 text-center text-white relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl mx-auto">
-            <h1 className="text-5xl font-bold mb-6 font-arabic">Sempurnakan Bacaan Al-Quran</h1>
-            <p className="text-xl text-emerald-100 mb-8">Platform pengajian Al-Quran online yang mudah, fleksibel dan dipercayai.</p>
-            <button onClick={onOpenAuth} className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl shadow-lg inline-flex items-center gap-2 transform hover:scale-105 transition">
-                Mula Belajar <ArrowRight />
-            </button>
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* Hero Section */}
+      <div className="bg-emerald-900 py-24 px-4 text-center text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-emerald-900 to-emerald-900"></div>
+        <div className="relative z-10 max-w-5xl mx-auto">
+            <span className="inline-block py-1 px-3 rounded-full bg-emerald-800 border border-emerald-600 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-6 animate-fade-in-up">Platform Mengaji #1 Di Malaysia</span>
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 font-arabic leading-tight tracking-tight">
+                Terangi Jiwa Dengan <br/> <span className="text-emerald-400">Cahaya Al-Quran</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-emerald-100 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
+                Kelas pengajian Al-Quran secara personal dan berkumpulan. Dibimbing oleh asatizah bertauliah, mudah dan fleksibel terus dari rumah anda.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <button onClick={onOpenAuth} className="w-full sm:w-auto px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2 transform hover:-translate-y-1 transition text-lg">
+                    Mula Belajar Sekarang <ArrowRight className="h-5 w-5"/>
+                </button>
+                <button onClick={() => document.getElementById('kelas-section')?.scrollIntoView({behavior: 'smooth'})} className="w-full sm:w-auto px-8 py-4 bg-emerald-800/50 hover:bg-emerald-800 text-emerald-100 border border-emerald-700 hover:text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition text-lg backdrop-blur-sm">
+                    Lihat Pakej Kelas
+                </button>
+            </div>
+            
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-emerald-200/80 text-sm font-medium">
+                 <div className="flex items-center gap-2 bg-emerald-800/30 px-3 py-1 rounded-full"><CheckCircle size={16} className="text-emerald-400"/> 500+ Pelajar Aktif</div>
+                 <div className="flex items-center gap-2 bg-emerald-800/30 px-3 py-1 rounded-full"><CheckCircle size={16} className="text-emerald-400"/> Guru Bertauliah</div>
+                 <div className="flex items-center gap-2 bg-emerald-800/30 px-3 py-1 rounded-full"><CheckCircle size={16} className="text-emerald-400"/> Jadual Fleksibel</div>
+            </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 py-16 w-full">
-          <h2 className="text-3xl font-bold text-center mb-10 text-gray-800">Kelas Pilihan</h2>
+
+      {/* Features / Value Proposition */}
+      <div className="py-24 bg-emerald-50">
+        <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-16">
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-arabic">Kenapa Pilih Nur Al-Quran?</h2>
+                <p className="text-gray-600 max-w-2xl mx-auto text-lg">Kami komited menyediakan pendidikan Al-Quran berkualiti tinggi yang sesuai dengan gaya hidup moden anda, tanpa mengabaikan tradisi ilmu.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition duration-300 text-center border border-emerald-100">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-emerald-600 rotate-3 hover:rotate-6 transition">
+                        <GraduationCap size={32} />
+                    </div>
+                    <h3 className="font-bold text-xl mb-3 text-gray-800">Guru Bertauliah</h3>
+                    <p className="text-gray-500 leading-relaxed">Barisan Ustaz & Ustazah yang mempunyai sanad dan berpengalaman luas dalam pengajaran.</p>
+                </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition duration-300 text-center border border-emerald-100">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-emerald-600 -rotate-3 hover:-rotate-6 transition">
+                        <Video size={32} />
+                    </div>
+                    <h3 className="font-bold text-xl mb-3 text-gray-800">Kelas Online Interaktif</h3>
+                    <p className="text-gray-500 leading-relaxed">Belajar secara bersemuka melalui Google Meet. Jelas, mudah dan menjimatkan masa perjalanan.</p>
+                </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition duration-300 text-center border border-emerald-100">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-emerald-600 rotate-3 hover:rotate-6 transition">
+                        <Clock size={32} />
+                    </div>
+                    <h3 className="font-bold text-xl mb-3 text-gray-800">Masa Fleksibel</h3>
+                    <p className="text-gray-500 leading-relaxed">Pilih waktu belajar yang sesuai dengan jadual harian anda, sama ada siang atau malam.</p>
+                </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition duration-300 text-center border border-emerald-100">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-emerald-600 -rotate-3 hover:-rotate-6 transition">
+                        <BookOpen size={32} />
+                    </div>
+                    <h3 className="font-bold text-xl mb-3 text-gray-800">Modul Komprehensif</h3>
+                    <p className="text-gray-500 leading-relaxed">Dari Iqra' asas, Talaqqi Al-Quran, hingga kelas Tarannum dan Tajwid lanjutan.</p>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* Classes Section */}
+      <div id="kelas-section" className="max-w-7xl mx-auto px-4 py-24 w-full">
+          <div className="text-center mb-16">
+            <span className="text-emerald-600 font-bold tracking-wider uppercase text-sm mb-2 block">Pilihan Pembelajaran</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-arabic">Pakej Pengajian Kami</h2>
+            <p className="text-gray-600 text-lg">Pilih kelas yang sesuai dengan tahap penguasaan dan matlamat anda.</p>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {classes.length === 0 ? (
-                <div className="col-span-3 text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">
-                    <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                    <p className="text-lg font-medium">Tiada kelas aktif buat masa ini.</p>
-                    <p className="text-sm">Sila semak semula nanti.</p>
+                <div className="col-span-3 text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-gray-500">
+                    <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                        <BookOpen className="h-10 w-10 text-gray-300" />
+                    </div>
+                    <p className="text-xl font-medium text-gray-700">Tiada kelas aktif buat masa ini.</p>
+                    <p className="text-sm mt-2">Sila semak semula nanti untuk jadual terkini.</p>
                 </div>
             ) : classes.map(cls => (
-              <div key={cls.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col">
-                 <div className="bg-slate-100 h-32 flex items-center justify-center relative">
-                    <BookOpen size={40} className="text-emerald-800/20" />
-                    <span className="absolute top-4 right-4 bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded-full uppercase">{cls.type}</span>
+              <div key={cls.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-300 flex flex-col group">
+                 <div className="bg-slate-50 h-40 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-emerald-900/5 group-hover:bg-emerald-900/10 transition"></div>
+                    <BookOpen size={48} className="text-emerald-800/20 group-hover:scale-110 transition duration-500" />
+                    <span className="absolute top-4 right-4 bg-white/90 backdrop-blur text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-sm">{cls.type}</span>
                  </div>
-                 <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold mb-2 text-gray-900">{cls.title}</h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                        <Calendar size={14} className="text-emerald-600"/>
-                        <span>{cls.schedule || "Jadual akan dimaklumkan"}</span>
+                 <div className="p-8 flex-1 flex flex-col">
+                    <h3 className="text-xl font-bold mb-3 text-gray-900 font-arabic group-hover:text-emerald-700 transition">{cls.title}</h3>
+                    <div className="space-y-3 mb-6">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                             <User size={16} className="text-emerald-500"/>
+                             <span className="font-medium">{cls.instructorName || "Pengajar: Admin"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar size={16} className="text-emerald-500"/>
+                            <span>{cls.schedule || "Jadual akan dimaklumkan"}</span>
+                        </div>
                     </div>
-                    <p className="text-gray-500 text-sm mb-4 line-clamp-3">{cls.description}</p>
-                    <div className="mt-auto pt-4 border-t flex justify-between items-center">
-                        <span className="font-bold text-xl text-emerald-600">RM {cls.price}</span>
-                        <button onClick={onOpenAuth} className="text-emerald-700 font-bold text-sm hover:underline flex items-center gap-1">Daftar <ArrowRight size={14}/></button>
+                    <p className="text-gray-500 text-sm mb-6 line-clamp-3 leading-relaxed">{cls.description}</p>
+                    <div className="mt-auto pt-6 border-t border-gray-100 flex justify-between items-center">
+                        <div>
+                            <span className="text-xs text-gray-400 font-medium uppercase">Yuran</span>
+                            <div className="font-bold text-2xl text-emerald-600">RM {cls.price}</div>
+                        </div>
+                        <button onClick={onOpenAuth} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2 transition">
+                            Daftar <ArrowRight size={16}/>
+                        </button>
                     </div>
                  </div>
               </div>
             ))}
           </div>
+      </div>
+
+      {/* Steps / How it works */}
+      <div className="py-24 bg-gray-900 text-white">
+        <div className="max-w-7xl mx-auto px-4">
+             <div className="text-center mb-16">
+                 <span className="text-emerald-400 font-bold tracking-wider uppercase text-sm mb-2 block">Proses Pendaftaran</span>
+                 <h2 className="text-3xl md:text-4xl font-bold font-arabic mb-4">Langkah Mudah Bermula</h2>
+                 <p className="text-gray-400">Mulakan perjalanan Al-Quran anda dalam 3 langkah ringkas.</p>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative max-w-5xl mx-auto">
+                {/* Connecting Line (Desktop) */}
+                <div className="hidden md:block absolute top-12 left-16 right-16 h-0.5 bg-gray-800 z-0"></div>
+
+                <div className="relative z-10 text-center">
+                    <div className="w-24 h-24 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-gray-800 relative">
+                        <span className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-sm border-4 border-gray-900">1</span>
+                        <User size={32} className="text-emerald-400"/>
+                    </div>
+                    <h3 className="text-xl font-bold mb-3">Daftar Akaun</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed px-4">Cipta akaun pelajar secara percuma untuk mengakses portal pembelajaran dan melihat jadual penuh.</p>
+                </div>
+                <div className="relative z-10 text-center">
+                     <div className="w-24 h-24 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-gray-800 relative">
+                        <span className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-sm border-4 border-gray-900">2</span>
+                        <Check size={32} className="text-emerald-400"/>
+                    </div>
+                    <h3 className="text-xl font-bold mb-3">Pilih & Daftar Kelas</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed px-4">Pilih sesi pengajian atau ustaz pilihan anda daripada senarai dan lakukan pembayaran yuran.</p>
+                </div>
+                <div className="relative z-10 text-center">
+                     <div className="w-24 h-24 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-gray-800 relative">
+                        <span className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-sm border-4 border-gray-900">3</span>
+                        <Video size={32} className="text-emerald-400"/>
+                    </div>
+                    <h3 className="text-xl font-bold mb-3">Mula Belajar</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed px-4">Masuk ke pautan Google Meet pada waktu yang ditetapkan. Selamat menuntut ilmu!</p>
+                </div>
+             </div>
+             
+             <div className="text-center mt-16">
+                 <button onClick={onOpenAuth} className="px-10 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full shadow-lg shadow-emerald-500/20 transition transform hover:-translate-y-1">
+                    Daftar Sekarang & Mula Belajar
+                 </button>
+             </div>
+        </div>
       </div>
     </div>
   );
@@ -352,6 +481,7 @@ const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => 
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-gray-900">{cls.title}</h4>
+                                            <p className="text-sm text-emerald-700 mb-1 font-semibold flex items-center gap-1"><User size={12}/> {cls.instructorName}</p>
                                             <p className="text-sm text-gray-600 flex items-center gap-2">
                                                 <span className="font-medium text-emerald-600">{cls.schedule || "Masa belum ditetapkan"}</span>
                                             </p>
@@ -377,6 +507,7 @@ const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => 
                         return (
                             <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition">
                                 <h3 className="font-bold text-lg mb-2">{cls.title}</h3>
+                                <p className="text-sm text-emerald-700 mb-2 flex items-center gap-1 font-semibold"><User size={14}/> {cls.instructorName || "Pengajar: Admin"}</p>
                                 <div className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Calendar size={12}/> {cls.schedule || "Jadual belum ada"}</div>
                                 <div className="flex justify-between items-end mb-4">
                                      <p className="text-emerald-600 font-bold text-xl">RM {cls.price}</p>
@@ -432,20 +563,15 @@ const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => 
     )
 };
 
-const InstructorDashboard = ({ user, classes, enrollments, onCreateClass }: any) => {
+const InstructorDashboard = ({ user, classes, enrollments }: any) => {
     // Determine which classes belong to this instructor.
-    const myClasses = classes; // In this simple version, Ustaz sees all
-
-    const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '' });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Pass instructorId automatically
-        onCreateClass({ ...formData, instructorId: user.id });
-        setShowForm(false);
-        setFormData({ title: '', price: '', link: '', description: '', schedule: '' });
-    }
+    // Filter classes where instructorName matches current user or if logic allows manual matching
+    // Since we don't have stable IDs in this demo, let's show all classes but highlight assigned ones if possible.
+    // For simplicity based on prompt: "only admin can create".
+    
+    // Filter logic: Show all active classes, but maybe ustaz wants to see only HIS.
+    // Since prompt didn't specify visibility restriction, just creation restriction, we show the list.
+    const myClasses = classes.filter((c:any) => c.instructorName && c.instructorName.toLowerCase().includes(user.name.toLowerCase()));
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -454,45 +580,15 @@ const InstructorDashboard = ({ user, classes, enrollments, onCreateClass }: any)
                     <h1 className="text-2xl font-bold flex items-center gap-2"><GraduationCap className="text-emerald-600"/> Dashboard Pengajar</h1>
                     <p className="text-gray-500 text-sm">Selamat datang, Ustaz {user.name}</p>
                 </div>
-                <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-emerald-700 transition shadow-sm">
-                    {showForm ? <XCircle size={18}/> : <Plus size={18}/>} 
-                    {showForm ? 'Batal' : 'Buka Kelas Baru'}
-                </button>
+                {/* REMOVED: Create Class Button */}
             </div>
 
-            {showForm && (
-                <div className="bg-white p-6 rounded-xl shadow-md border mb-8 animate-fade-in-up">
-                    <h3 className="font-bold mb-4 text-lg border-b pb-2">Maklumat Kelas Baru</h3>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Talaqqi" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Jadual / Masa</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Isnin & Khamis, 9:00 Malam" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Yuran (RM)</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium mb-1">Google Meet Link</label>
-                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Penerangan</label>
-                            <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
-                        </div>
-                        <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Terbitkan Kelas</button>
-                    </form>
-                </div>
-            )}
+            {/* REMOVED: Create Class Form */}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* My Classes List */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Kelas Anda</h3>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Kelas Ditugaskan Kepada Anda</h3>
                     <div className="overflow-y-auto max-h-[400px]">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0">
@@ -510,7 +606,7 @@ const InstructorDashboard = ({ user, classes, enrollments, onCreateClass }: any)
                                         <td className="p-3 text-right">RM {c.price}</td>
                                     </tr>
                                 ))}
-                                {myClasses.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada kelas.</td></tr>}
+                                {myClasses.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada kelas ditugaskan atas nama anda ({user.name}).</td></tr>}
                             </tbody>
                         </table>
                     </div>
@@ -556,13 +652,49 @@ const InstructorDashboard = ({ user, classes, enrollments, onCreateClass }: any)
 
 const AdminDashboard = ({ classes, onCreateClass }: any) => {
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '' });
+    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '' });
+
+    // Schedule Generator State
+    const [useAutoSchedule, setUseAutoSchedule] = useState(false);
+    const [startDay, setStartDay] = useState('');
+    const [startTime, setStartTime] = useState('');
+
+    const generateSchedule = () => {
+        if (!startDay || !startTime) {
+            alert("Sila pilih tarikh mula dan masa.");
+            return;
+        }
+
+        const dates = [];
+        let currentDate = new Date(startDay);
+
+        for (let i = 0; i < 4; i++) {
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            dates.push(`${day}/${month}`);
+            
+            // Add 7 days
+            currentDate.setDate(currentDate.getDate() + 7);
+        }
+
+        // Convert 24hr time to 12hr format for display
+        let [hours, minutes] = startTime.split(':');
+        let modifier = +hours >= 12 ? 'PM' : 'AM';
+        let hrs = +hours % 12 || 12;
+        let niceTime = `${hrs}:${minutes} ${modifier}`;
+
+        const finalString = `${dates.join(', ')} (${niceTime})`;
+        setFormData({ ...formData, schedule: finalString });
+    }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onCreateClass(formData);
         setShowForm(false);
-        setFormData({ title: '', price: '', link: '', description: '', schedule: '' });
+        setFormData({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '' });
+        setUseAutoSchedule(false);
+        setStartDay('');
+        setStartTime('');
     }
 
     return (
@@ -583,10 +715,40 @@ const AdminDashboard = ({ classes, onCreateClass }: any) => {
                             <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Iqra" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
                         </div>
+                        
                         <div>
-                            <label className="block text-sm font-medium mb-1">Jadual / Masa</label>
+                            <label className="block text-sm font-medium mb-1">Nama Pengajar (Ustaz)</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Nama Ustaz yang bertugas" value={formData.instructorName} onChange={e=>setFormData({...formData, instructorName: e.target.value})} required/>
+                        </div>
+
+                        {/* Jadual Section */}
+                        <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-bold">Jadual / Masa</label>
+                                <button type="button" onClick={() => setUseAutoSchedule(!useAutoSchedule)} className="text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline">
+                                    <Wand2 size={12}/> {useAutoSchedule ? "Tulis Manual" : "Jana Jadual Automatik (4 Sesi)"}
+                                </button>
+                            </div>
+
+                            {useAutoSchedule ? (
+                                <div className="grid grid-cols-2 gap-4 mb-2 animate-fade-in-up">
+                                    <div>
+                                        <label className="text-xs text-gray-500">Tarikh Mula</label>
+                                        <input type="date" className="border w-full p-2 rounded" value={startDay} onChange={e=>setStartDay(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500">Masa</label>
+                                        <input type="time" className="border w-full p-2 rounded" value={startTime} onChange={e=>setStartTime(e.target.value)} />
+                                    </div>
+                                    <button type="button" onClick={generateSchedule} className="col-span-2 bg-emerald-100 text-emerald-700 py-1 rounded text-sm font-bold hover:bg-emerald-200">
+                                        Jana Tarikh
+                                    </button>
+                                </div>
+                            ) : null}
+
                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Setiap Jumaat, 9:00 PM" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
                         </div>
+
                         <div>
                             <label className="block text-sm font-medium mb-1">Harga (RM)</label>
                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
@@ -609,6 +771,7 @@ const AdminDashboard = ({ classes, onCreateClass }: any) => {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="p-4 text-left font-semibold text-gray-600">Kelas</th>
+                            <th className="p-4 text-left font-semibold text-gray-600">Pengajar</th>
                             <th className="p-4 text-left font-semibold text-gray-600">Jadual</th>
                             <th className="p-4 text-left font-semibold text-gray-600">Harga</th>
                             <th className="p-4 text-left font-semibold text-gray-600">Status</th>
@@ -616,11 +779,12 @@ const AdminDashboard = ({ classes, onCreateClass }: any) => {
                     </thead>
                     <tbody>
                         {classes.length === 0 && (
-                            <tr><td colSpan={4} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
+                            <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
                         )}
                         {classes.map((c: any) => (
                             <tr key={c.id} className="border-b hover:bg-gray-50">
                                 <td className="p-4 font-medium">{c.title}</td>
+                                <td className="p-4 text-gray-500"><User size={14} className="inline mr-1"/>{c.instructorName || "-"}</td>
                                 <td className="p-4 text-gray-500 text-sm">{c.schedule}</td>
                                 <td className="p-4 text-emerald-600 font-bold">RM {c.price}</td>
                                 <td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase">Aktif</span></td>
@@ -734,7 +898,7 @@ const App = () => {
       const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
       
       if (role === 'admin') return <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />;
-      if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />;
+      if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} />;
       if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
       
       // Fallback if role is weird or corrupted data leaked through
@@ -771,9 +935,11 @@ const App = () => {
       {renderDashboard()}
     
       {/* Footer / Debug Info */}
-      <div className="text-center py-8 text-gray-400 text-xs">
-         <p>Powered by Google Apps Script Database</p>
-         <p className="mt-1">Version 2.0 (No-SQL)</p>
+      <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
+         <div className="max-w-7xl mx-auto px-4">
+            <p className="font-semibold text-emerald-900 mb-2">Nur Al-Quran Digital</p>
+            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi & Kasih sayang .</p>
+         </div>
       </div>
     </div>
   );
