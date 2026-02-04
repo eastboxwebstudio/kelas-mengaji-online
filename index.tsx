@@ -147,9 +147,11 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
   if (!isOpen) return null;
 
   const sanitizeUser = (rawUser: any): Profile => {
+      // Safely handle role casting
+      const roleStr = rawUser.role ? String(rawUser.role) : 'student';
       return {
           ...rawUser,
-          role: (rawUser.role || 'student').toLowerCase().trim() as UserRole
+          role: roleStr.toLowerCase().trim() as UserRole
       };
   }
 
@@ -626,10 +628,18 @@ const App = () => {
     // Check local storage for simple persist
     const stored = localStorage.getItem('currentUser');
     if (stored) {
-       const u = JSON.parse(stored);
-       // Normalize role on load
-       if(u.role) u.role = u.role.toLowerCase().trim();
-       setUser(u);
+       try {
+        const u = JSON.parse(stored);
+        if (u) {
+            // Normalize role on load safely
+            const r = u.role ? String(u.role) : 'student';
+            u.role = r.toLowerCase().trim();
+            setUser(u);
+        }
+       } catch(e) { 
+           console.error("Storage corrupt", e);
+           localStorage.removeItem('currentUser');
+       }
     }
     fetchData();
   }, []);
@@ -696,7 +706,8 @@ const App = () => {
   const renderDashboard = () => {
       if (!user) return <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />;
       
-      const role = (user.role || '').toLowerCase().trim();
+      // Safe cast
+      const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
       
       if (role === 'admin') return <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />;
       if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />;
