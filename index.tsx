@@ -1,59 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createClient } from '@supabase/supabase-js';
 import { 
   BookOpen, 
-  Calendar, 
-  CreditCard, 
-  Users, 
-  Video, 
-  Plus, 
+  User, 
   LogOut, 
   CheckCircle, 
-  XCircle,
-  LayoutDashboard,
-  Home,
-  User,
-  Clock,
-  DollarSign,
-  ChevronDown,
-  ChevronUp,
-  Repeat,
-  GraduationCap,
-  CalendarDays,
-  Star,
-  PlayCircle,
-  ShieldCheck,
+  XCircle, 
+  Loader2, 
+  Inbox, 
+  Settings, 
+  Plus, 
+  CreditCard, 
+  Video, 
+  GraduationCap, 
   ArrowRight,
-  FileText,
-  Printer,
-  List,
-  Mail,
-  Lock,
-  Phone,
-  Loader2,
-  Inbox,
-  Settings,
-  Save,
-  WifiOff,
+  Sheet,
+  Database,
+  AlertCircle,
   RefreshCw,
-  AlertTriangle,
-  Globe
+  Users,
+  Calendar,
+  Clock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
-// --- SUPABASE CONFIGURATION ---
+// --- CONFIGURATION ---
 
-const SUPABASE_URL = 'https://amdfwcintewpjukgmwve.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
-
-// Konfigurasi Client
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
+// URL Web App Google Apps Script anda
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnRE4NaXFw4uWD8_6EpL5o743Btqgce8UyWzoEEQGOgxX_JsiSaTSgEnyfdyqLGkXeRQ/exec"; 
 
 // --- Types & Interfaces ---
 
@@ -65,13 +40,14 @@ interface Profile {
   email: string;
   role: UserRole;
   phone?: string;
+  password?: string;
 }
 
 interface ClassSession {
   id: string;
   title: string;
   description: string;
-  sessions: string[]; 
+  schedule: string; 
   price: number;
   googleMeetLink: string; 
   isActive: boolean; 
@@ -86,13 +62,49 @@ interface Enrollment {
   classId: string; 
   status: 'Unpaid' | 'Paid';
   transactionId?: string; 
-  billCode?: string; 
 }
+
+// --- API Helper ---
+
+const apiCall = async (action: string, payload: any = {}, method = 'GET') => {
+  // Google Apps Script Web App handling
+  let url = GOOGLE_SCRIPT_URL;
+  let options: RequestInit = { method };
+
+  if (method === 'GET') {
+    const params = new URLSearchParams({ action, ...payload });
+    url = `${GOOGLE_SCRIPT_URL}?${params.toString()}`;
+  } else {
+    options.body = JSON.stringify({ action, ...payload });
+    // Use text/plain to avoid CORS preflight issues in GAS
+    options.headers = { 'Content-Type': 'text/plain' };
+  }
+
+  try {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    
+    let json;
+    try {
+        json = JSON.parse(text);
+    } catch (e) {
+        console.error("Server returned non-JSON:", text);
+        throw new Error("Ralat pelayan: Data tidak sah diterima dari Google Sheet. Sila pastikan deployment GAS betul.");
+    }
+
+    if (!response.ok) throw new Error("Gagal menghubungi Google Sheet: " + response.statusText);
+    if (json.status === 'error' || json.error) throw new Error(json.message || json.error);
+    
+    return json;
+  } catch (err: any) {
+     throw new Error(err.message || "Ralat rangkaian.");
+  }
+};
 
 // --- Components ---
 
 const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAuth: () => void, onLogout: () => void }) => (
-  <nav className="bg-emerald-900 text-white shadow-lg sticky top-0 z-50 print:hidden">
+  <nav className="bg-emerald-900 text-white shadow-lg sticky top-0 z-50">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between h-16 items-center">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
@@ -107,27 +119,14 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
                 <span className="truncate max-w-[150px]">{user.name}</span>
                 <span className="text-emerald-300 text-xs font-bold uppercase">({user.role === 'ustaz' ? 'Pengajar' : user.role})</span>
               </div>
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onLogout();
-                }} 
-                className="text-emerald-100 hover:text-white hover:bg-emerald-800 p-2 rounded-full transition flex items-center justify-center"
-                title="Log Keluar"
-              >
+              <button onClick={onLogout} className="text-emerald-100 hover:text-white hover:bg-emerald-800 p-2 rounded-full transition" title="Log Keluar">
                 <LogOut size={20} />
               </button>
             </>
           ) : (
-            <div className="flex gap-2">
-              <button 
-                onClick={onOpenAuth}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-sm font-semibold transition shadow-lg shadow-emerald-900/50 flex items-center gap-2"
-              >
-                <User size={16} /> Log Masuk / Daftar
-              </button>
-            </div>
+            <button onClick={onOpenAuth} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-sm font-semibold transition shadow-lg flex items-center gap-2">
+               <User size={16} /> Log Masuk
+            </button>
           )}
         </div>
       </div>
@@ -135,72 +134,50 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
   </nav>
 );
 
-const AuthModal = ({ 
-  isOpen, 
-  onClose
-}: { 
-  isOpen: boolean, 
-  onClose: () => void
-}) => {
+const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () => void, onLogin: (u: Profile) => void }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
-  // Form State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'student' | 'ustaz'>('student');
-
-  useEffect(() => {
-    if (!isOpen) {
-      setError('');
-      setSuccessMsg('');
-      setIsLoading(false);
-      setPassword('');
-    }
-  }, [isOpen]);
+  // Default role 'student', user can change to 'ustaz'
+  const [formData, setFormData] = useState<{name: string, email: string, password: string, phone: string, role: UserRole}>({ 
+      name: '', email: '', password: '', phone: '', role: 'student' 
+  });
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccessMsg('');
     setIsLoading(true);
+
+    const email = formData.email.trim();
+    const password = formData.password.trim();
 
     try {
       if (isRegistering) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              name: name,
-              phone: phone,
-              role: role
-            }
-          }
-        });
-
-        if (signUpError) throw signUpError;
-        setSuccessMsg("Pendaftaran berjaya! Anda kini telah log masuk secara automatik.");
-        setTimeout(() => onClose(), 1500);
-
+        const payload = { ...formData, email, password };
+        const res = await apiCall('register', payload, 'POST');
+        if (res.user) {
+           localStorage.setItem('currentUser', JSON.stringify(res.user));
+           onLogin(res.user);
+           onClose();
+        }
       } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (signInError) throw signInError;
-        onClose();
+        // Use POST for login to be consistent and secure, and avoid URL encoding issues
+        const res = await apiCall('login', { email, password }, 'POST');
+        if (res.user) {
+            localStorage.setItem('currentUser', JSON.stringify(res.user));
+            onLogin(res.user);
+            onClose();
+        } else {
+            setError("Emel atau kata laluan salah.");
+        }
       }
     } catch (err: any) {
-      console.error("Auth Error:", err);
-      setError(err.message || "Ralat berlaku. Sila cuba lagi.");
+      console.error(err);
+      setError(err.message || "Ralat sambungan. Sila cuba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -210,125 +187,62 @@ const AuthModal = ({
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in-up">
-        <div className="bg-emerald-800 h-32 relative flex items-center justify-center">
-            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
-            <div className="relative z-10 text-center">
-               <BookOpen className="h-10 w-10 text-emerald-300 mx-auto mb-2" />
-               <h2 className="text-2xl font-bold text-white font-arabic tracking-wide">Nur Al-Quran</h2>
-            </div>
-            <button onClick={onClose} className="absolute top-4 right-4 text-emerald-200 hover:text-white">
-               <XCircle size={24} />
-            </button>
+        <div className="bg-emerald-800 p-6 text-center text-white relative">
+            <h2 className="text-2xl font-bold font-arabic">Nur Al-Quran</h2>
+            <p className="text-emerald-200 text-sm">{isRegistering ? 'Daftar Akaun Baru' : 'Selamat Kembali'}</p>
+            <button onClick={onClose} className="absolute top-4 right-4 text-emerald-200 hover:text-white"><XCircle/></button>
         </div>
-
         <div className="p-8">
-           <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
-             {isRegistering ? 'Daftar Akaun Baru' : 'Log Masuk ke Akaun'}
-           </h3>
-
-           {error && (
-             <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-center gap-2">
-               <XCircle size={16} /> {error}
-             </div>
-           )}
-
-           {successMsg && (
-             <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg flex items-center gap-2">
-               <CheckCircle size={16} /> {successMsg}
-             </div>
-           )}
-
+           {error && <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg flex gap-2"><XCircle size={16}/> {error}</div>}
+           
            <form onSubmit={handleSubmit} className="space-y-4">
               {isRegistering && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nama Penuh</label>
-                    <input 
-                        type="text" 
-                        placeholder="Contoh: Ahmad bin Abdullah"
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        required
-                      />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">No. Telefon</label>
-                    <input 
-                        type="tel" 
-                        placeholder="+60123456789"
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        required
-                      />
+                  <input type="text" placeholder="Nama Penuh" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                  <input type="tel" placeholder="No. Telefon" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
+                  
+                  {/* Role Selection */}
+                  <div className="flex gap-4 p-2 bg-gray-50 rounded-lg border">
+                      <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer">
+                          <input type="radio" name="role" value="student" checked={formData.role === 'student'} onChange={() => setFormData({...formData, role: 'student'})} className="text-emerald-600 focus:ring-emerald-500" />
+                          <span className="text-sm font-medium text-gray-700">Pelajar</span>
+                      </label>
+                      <div className="w-px bg-gray-300"></div>
+                      <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer">
+                          <input type="radio" name="role" value="ustaz" checked={formData.role === 'ustaz'} onChange={() => setFormData({...formData, role: 'ustaz'})} className="text-emerald-600 focus:ring-emerald-500" />
+                          <span className="text-sm font-medium text-gray-700">Pengajar</span>
+                      </label>
                   </div>
                 </>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Alamat E-mel</label>
+              <input type="email" placeholder="E-mel" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+              
+              <div className="relative">
                 <input 
-                    type="email" 
-                    placeholder="nama@email.com"
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                  />
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Kata Laluan" 
+                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" 
+                    value={formData.password} 
+                    onChange={e => setFormData({...formData, password: e.target.value})} 
+                    required 
+                />
+                <button 
+                    type="button"
+                    className="absolute right-3 top-3 text-gray-400 hover:text-emerald-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
-                <input 
-                    type="password" 
-                    placeholder="••••••••"
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                  />
-              </div>
-
-              {isRegistering && (
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Daftar Sebagai</label>
-                    <div className="flex gap-4">
-                      <label className={`flex-1 border rounded-lg p-3 cursor-pointer text-center transition ${role === 'student' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : 'hover:bg-gray-50'}`}>
-                        <input type="radio" className="hidden" checked={role === 'student'} onChange={() => setRole('student')} />
-                        <span className="font-semibold text-sm">Pelajar</span>
-                      </label>
-                      <label className={`flex-1 border rounded-lg p-3 cursor-pointer text-center transition ${role === 'ustaz' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : 'hover:bg-gray-50'}`}>
-                        <input type="radio" className="hidden" checked={role === 'ustaz'} onChange={() => setRole('ustaz')} />
-                        <span className="font-semibold text-sm">Pengajar</span>
-                      </label>
-                    </div>
-                 </div>
-              )}
-
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <> <Loader2 className="animate-spin" size={20} /> Memproses... </>
-                ) : (
-                  isRegistering ? 'Daftar Sekarang' : 'Log Masuk'
-                )}
+              
+              <button type="submit" disabled={isLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg flex justify-center gap-2 transition-all">
+                {isLoading && <Loader2 className="animate-spin" />} {isRegistering ? 'Daftar Sekarang' : 'Log Masuk'}
               </button>
            </form>
-
-           <div className="mt-6 text-center text-sm text-gray-600">
-             {isRegistering ? "Sudah mempunyai akaun? " : "Belum mempunyai akaun? "}
-             <button 
-               onClick={() => {
-                   setIsRegistering(!isRegistering);
-                   setError('');
-               }} 
-               className="text-emerald-600 font-bold hover:underline"
-             >
-               {isRegistering ? "Log Masuk" : "Daftar Percuma"}
+           <div className="mt-4 text-center text-sm">
+             <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="text-emerald-600 font-bold hover:underline">
+               {isRegistering ? "Sudah ada akaun? Log Masuk" : "Belum ada akaun? Daftar"}
              </button>
            </div>
         </div>
@@ -338,496 +252,355 @@ const AuthModal = ({
 };
 
 const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenAuth: () => void }) => {
-  const highlightedClasses = classes.filter(c => c.isActive).slice(0, 3);
-
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <div className="relative bg-emerald-900 overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10 flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 text-center md:text-left space-y-6">
-            <span className="inline-block bg-emerald-800 text-emerald-300 text-sm font-semibold px-3 py-1 rounded-full border border-emerald-700">
-              #1 Platform Mengaji Online
-            </span>
-            <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight font-arabic">
-              Sempurnakan Bacaan <br/> <span className="text-emerald-400">Al-Quran Anda</span>
-            </h1>
-            <p className="text-emerald-100 text-lg md:text-xl max-w-2xl mx-auto md:mx-0">
-              Sertai ribuan pelajar dalam sesi pengajian Al-Quran secara online. 
-              Belajar Tajwid, Talaqqi, dan Fardu Ain bersama asatizah bertauliah dari keselesaan rumah anda.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <button 
-                onClick={onOpenAuth}
-                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
-              >
-                Mula Belajar Sekarang <ArrowRight size={20} />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 w-full max-w-md md:max-w-full">
-            <div className="relative">
-              <div className="absolute -inset-4 bg-emerald-500/30 rounded-full blur-3xl"></div>
-              <img 
-                src="https://images.unsplash.com/photo-1609599006353-e629aaabfeae?q=80&w=1000&auto=format&fit=crop" 
-                alt="Quran Reading" 
-                className="relative rounded-2xl shadow-2xl border-4 border-emerald-800/50 transform rotate-2 hover:rotate-0 transition duration-500"
-              />
-            </div>
-          </div>
+      <div className="bg-emerald-900 py-20 px-4 text-center text-white relative overflow-hidden">
+        <div className="relative z-10 max-w-3xl mx-auto">
+            <h1 className="text-5xl font-bold mb-6 font-arabic">Sempurnakan Bacaan Al-Quran</h1>
+            <p className="text-xl text-emerald-100 mb-8">Platform pengajian Al-Quran online yang mudah, fleksibel dan dipercayai.</p>
+            <button onClick={onOpenAuth} className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl shadow-lg inline-flex items-center gap-2 transform hover:scale-105 transition">
+                Mula Belajar <ArrowRight />
+            </button>
         </div>
       </div>
-
-      {/* Highlighted Classes */}
-      <div className="bg-white py-20">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 font-arabic">Kelas Terkini & Popular</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Pilih kelas yang bersesuaian dengan tahap dan masa anda. Daftar segera sebelum kuota penuh.</p>
-          </div>
-
+      <div className="max-w-7xl mx-auto px-4 py-16 w-full">
+          <h2 className="text-3xl font-bold text-center mb-10 text-gray-800">Kelas Pilihan</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {highlightedClasses.length === 0 ? (
-                <div className="col-span-3 text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+            {classes.length === 0 ? (
+                <div className="col-span-3 text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">
                     <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900">Tiada Kelas Ditemui</h3>
-                    <p className="text-gray-500">
-                        Kelas baru akan dibuka tidak lama lagi.
-                    </p>
+                    <p className="text-lg font-medium">Tiada kelas aktif buat masa ini.</p>
+                    <p className="text-sm">Sila semak semula nanti.</p>
                 </div>
-            ) : highlightedClasses.map(cls => (
-              <div key={cls.id} className="group bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative">
-                 <div className="absolute top-4 right-4 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full z-10">
-                    {cls.type === 'monthly' ? 'Pakej Bulanan' : 'Sesi Khas'}
+            ) : classes.map(cls => (
+              <div key={cls.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col">
+                 <div className="bg-slate-100 h-32 flex items-center justify-center relative">
+                    <BookOpen size={40} className="text-emerald-800/20" />
+                    <span className="absolute top-4 right-4 bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded-full uppercase">{cls.type}</span>
                  </div>
-
-                 <div className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center relative overflow-hidden group-hover:scale-105 transition-transform duration-500">
-                    <BookOpen size={48} className="text-emerald-800/20" />
-                    <div className="absolute bottom-4 left-6 text-emerald-900 font-bold text-xl drop-shadow-md">
-                       RM {cls.price}
-                    </div>
-                 </div>
-
                  <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium mb-2">
-                       <GraduationCap size={16} />
-                       {cls.instructorName}
+                    <h3 className="text-lg font-bold mb-2 text-gray-900">{cls.title}</h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                        <Calendar size={14} className="text-emerald-600"/>
+                        <span>{cls.schedule || "Jadual akan dimaklumkan"}</span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors">
-                      {cls.title}
-                    </h3>
-                    <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-                      {cls.description}
-                    </p>
-
-                    <div className="mt-auto space-y-3">
-                       <button 
-                         onClick={onOpenAuth}
-                         className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2"
-                       >
-                         Daftar Sekarang <ArrowRight size={16} />
-                       </button>
+                    <p className="text-gray-500 text-sm mb-4 line-clamp-3">{cls.description}</p>
+                    <div className="mt-auto pt-4 border-t flex justify-between items-center">
+                        <span className="font-bold text-xl text-emerald-600">RM {cls.price}</span>
+                        <button onClick={onOpenAuth} className="text-emerald-700 font-bold text-sm hover:underline flex items-center gap-1">Daftar <ArrowRight size={14}/></button>
                     </div>
                  </div>
               </div>
             ))}
           </div>
-        </div>
       </div>
     </div>
   );
 };
 
-// ... InstructorDashboard, AdminSettings, AdminDashboard, StudentPortal ...
-// Included same as before to maintain file integrity
+const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => {
+    const myEnrolls = enrollments.filter((e: Enrollment) => e.userId === user.id);
+    const myClassIds = myEnrolls.map((e: Enrollment) => e.classId);
 
-const InstructorDashboard = ({ 
-    user,
-    classes, 
-    enrollments 
-  }: { 
-    user: Profile,
-    classes: ClassSession[], 
-    enrollments: Enrollment[]
-  }) => {
-    const [activeTab, setActiveTab] = useState<'schedule' | 'students'>('schedule');
-    const myClasses = classes.filter(c => c.instructorId === user.id);
-    const myClassIds = myClasses.map(c => c.id);
-    const myEnrollments = enrollments.filter(e => myClassIds.includes(e.classId));
-    
-     const getMySchedule = () => {
-      const sessions = myClasses.flatMap(c => 
-        (c.sessions || []).map((date, idx) => ({ 
-          classTitle: c.title,
-          date: new Date(date),
-          link: c.googleMeetLink,
-          status: c.isActive,
-          type: c.type,
-          sessionNumber: idx + 1,
-          totalSessions: c.sessions?.length || 0
-        }))
-      );
-      return sessions.sort((a, b) => a.date.getTime() - b.date.getTime());
-    };
-    const handlePrint = () => window.print();
+    // Get my active classes to show schedule
+    const myActiveClasses = classes.filter((c: ClassSession) => myClassIds.includes(c.id));
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
-            <style>{`
-            @media print {
-                @page { margin: 1cm; size: portrait; }
-                .no-print { display: none !important; }
-                .print-only { display: block !important; }
-                body { background-color: white !important; }
-            }
-            `}</style>
-            <div className="flex justify-between items-center mb-8 no-print">
-                 <h1 className="text-2xl font-bold">Dashboard Pengajar: {user.name}</h1>
-                 <div className="flex gap-2">
-                    <button onClick={() => setActiveTab('schedule')} className="px-4 py-2 bg-emerald-100 text-emerald-800 rounded">Jadual</button>
-                    <button onClick={() => setActiveTab('students')} className="px-4 py-2 bg-white text-gray-600 rounded">Pelajar</button>
+            <h1 className="text-2xl font-bold mb-8">Portal Pelajar: <span className="text-emerald-600">{user.name}</span></h1>
+            
+            {/* JADUAL SECTION */}
+            <div className="mb-12">
+                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calendar size={20} className="text-emerald-600"/> Jadual Kelas Saya</h2>
+                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    {myActiveClasses.length === 0 ? (
+                        <div className="p-8 text-center text-gray-400">Tiada kelas berdaftar. Jadual kosong.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 divide-y">
+                            {myActiveClasses.map((cls: ClassSession) => (
+                                <div key={cls.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-gray-50 transition">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-emerald-100 p-3 rounded-full text-emerald-700">
+                                            <Clock size={20}/>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900">{cls.title}</h4>
+                                            <p className="text-sm text-gray-600 flex items-center gap-2">
+                                                <span className="font-medium text-emerald-600">{cls.schedule || "Masa belum ditetapkan"}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 md:mt-0">
+                                        <a href={cls.googleMeetLink} target="_blank" className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
+                                            <Video size={16}/> Link Google Meet
+                                        </a>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                  </div>
             </div>
 
-             {activeTab === 'schedule' && (
-                <div className="bg-white p-6 rounded shadow">
-                    <button onClick={handlePrint} className="mb-4 bg-emerald-600 text-white px-4 py-2 rounded no-print">Cetak Jadual</button>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                             <thead><tr className="bg-gray-50"><th className="p-3 text-left">Masa</th><th className="p-3 text-left">Kelas</th><th className="p-3 text-left">Link</th></tr></thead>
-                             <tbody>
-                                 {getMySchedule().map((s, i) => (
-                                     <tr key={i} className="border-b">
-                                         <td className="p-3">{s.date.toLocaleString()}</td>
-                                         <td className="p-3">{s.classTitle} <span className="text-xs text-gray-500">({s.type})</span></td>
-                                         <td className="p-3 text-blue-600">{s.link}</td>
-                                     </tr>
-                                 ))}
-                             </tbody>
-                        </table>
-                    </div>
+            <div className="mb-12">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Senarai Kelas Ditawarkan</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {classes.map((cls: ClassSession) => {
+                        const enrolled = myClassIds.includes(cls.id);
+                        return (
+                            <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition">
+                                <h3 className="font-bold text-lg mb-2">{cls.title}</h3>
+                                <div className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Calendar size={12}/> {cls.schedule || "Jadual belum ada"}</div>
+                                <div className="flex justify-between items-end mb-4">
+                                     <p className="text-emerald-600 font-bold text-xl">RM {cls.price}</p>
+                                     <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{cls.type}</span>
+                                </div>
+                                <p className="text-sm text-gray-500 mb-4 line-clamp-2">{cls.description}</p>
+                                {enrolled ? (
+                                    <button disabled className="w-full bg-gray-100 text-gray-400 py-2 rounded font-medium cursor-not-allowed border border-gray-200">Telah Daftar</button>
+                                ) : (
+                                    <button onClick={() => onEnroll(cls.id)} className="w-full bg-emerald-600 text-white py-2 rounded font-medium hover:bg-emerald-700 transition shadow-sm">Daftar Sekarang</button>
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
-             )}
+            </div>
 
-             {activeTab === 'students' && (
-                 <div className="bg-white p-6 rounded shadow">
-                      <h3 className="mb-4 font-bold">Senarai Pelajar</h3>
-                      <table className="min-w-full">
-                          <thead><tr className="bg-gray-50"><th className="p-3 text-left">ID Pelajar</th><th className="p-3 text-left">Kelas</th></tr></thead>
-                          <tbody>
-                              {myEnrollments.map((e, i) => {
-                                  const c = classes.find(cl => cl.id === e.classId);
-                                  return (
-                                      <tr key={i} className="border-b">
-                                          <td className="p-3">{e.userId}</td>
-                                          <td className="p-3">{c?.title}</td>
-                                      </tr>
-                                  )
-                              })}
-                          </tbody>
-                      </table>
-                 </div>
-             )}
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Inbox size={20} className="text-emerald-600"/> Status Yuran</h2>
+            <div className="space-y-4">
+                {myEnrolls.length === 0 && (
+                    <div className="p-8 text-center bg-gray-50 border border-dashed rounded-xl text-gray-500">
+                        Anda belum mendaftar sebarang kelas.
+                    </div>
+                )}
+                {myEnrolls.map((e: Enrollment) => {
+                    const cls = classes.find((c: ClassSession) => c.id === e.classId);
+                    if(!cls) return null;
+                    return (
+                        <div key={e.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <h4 className="font-bold text-lg">{cls.title}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className={`text-xs px-2 py-1 rounded font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        {e.status === 'Paid' ? 'Lunas' : 'Belum Bayar'}
+                                    </span>
+                                    <span className="text-sm text-gray-500">ID: {e.id.substring(0,8)}...</span>
+                                </div>
+                            </div>
+                            {e.status === 'Paid' ? (
+                                <a href={cls.googleMeetLink} target="_blank" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium transition shadow-sm">
+                                    <Video size={18} /> Masuk Google Meet
+                                </a>
+                            ) : (
+                                <button onClick={() => onPay(e.id)} className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 font-medium transition shadow-sm animate-pulse">
+                                    <CreditCard size={18} /> Bayar Yuran
+                                </button>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
         </div>
     )
-  };
-
-const AdminSettings = () => {
-  const [settings, setSettings] = useState({
-    toyyibpay_secret_key: '',
-    toyyibpay_category_code: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('key, value')
-      .in('key', ['toyyibpay_secret_key', 'toyyibpay_category_code']);
-
-    if (error) {
-       console.error("Error fetching settings:", error);
-    }
-
-    if (data) {
-      const mapped = data.reduce((acc: any, curr) => {
-        acc[curr.key] = curr.value;
-        return acc;
-      }, {});
-      setSettings(prev => ({ ...prev, ...mapped }));
-    }
-    setLoading(false);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    
-    try {
-        const updates = [
-          { key: 'toyyibpay_secret_key', value: settings.toyyibpay_secret_key },
-          { key: 'toyyibpay_category_code', value: settings.toyyibpay_category_code }
-        ];
-
-        const { error } = await supabase
-          .from('app_settings')
-          .upsert(updates);
-
-        if (error) {
-            console.error(error);
-            alert('Gagal menyimpan tetapan: ' + error.message);
-        } else {
-            alert('Tetapan berjaya disimpan!');
-        }
-    } catch (err: any) {
-        console.error("Unexpected error:", err);
-        alert("Ralat tidak dijangka: " + err.message);
-    } finally {
-        setSaving(false);
-    }
-  };
-
-  return (
-    <div className="bg-white p-6 rounded shadow">
-      <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-        <Settings className="text-emerald-600"/> Konfigurasi Pembayaran (ToyyibPay)
-      </h3>
-
-      {loading ? (
-        <div className="py-10 text-center text-gray-500">Memuatkan tetapan...</div>
-      ) : (
-        <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">User Secret Key</label>
-            <input 
-              type="text"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              value={settings.toyyibpay_secret_key}
-              onChange={e => setSettings({...settings, toyyibpay_secret_key: e.target.value})}
-              placeholder="Contoh: 7d6c..."
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category Code</label>
-            <input 
-              type="text"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              value={settings.toyyibpay_category_code}
-              onChange={e => setSettings({...settings, toyyibpay_category_code: e.target.value})}
-              placeholder="Contoh: t54r..."
-            />
-          </div>
-          <div className="pt-4 border-t">
-            <button type="submit" disabled={saving} className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold flex items-center gap-2">
-              {saving ? 'Menyimpan...' : <><Save size={18} /> Simpan Tetapan</>}
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
-  );
 };
 
-const AdminDashboard = ({ 
-  classes, 
-  enrollments, 
-  onCreateClass 
-}: { 
-  classes: ClassSession[], 
-  enrollments: Enrollment[], 
-  onCreateClass: (c: any) => void 
-}) => {
-  const [activeTab, setActiveTab] = useState<'classes' | 'settings'>('classes');
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-      title: '', description: '', startDate: '', price: '', googleMeetLink: '', instructorId: ''
-  });
-  const [classType, setClassType] = useState<'single' | 'monthly'>('single');
+const InstructorDashboard = ({ user, classes, enrollments, onCreateClass }: any) => {
+    // Determine which classes belong to this instructor.
+    const myClasses = classes; // In this simple version, Ustaz sees all
 
-  const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const sessions = [];
-      const start = new Date(formData.startDate);
-      if(classType === 'single') sessions.push(start.toISOString());
-      else {
-          for(let i=0; i<4; i++) {
-              const d = new Date(start); d.setDate(start.getDate() + (i*7));
-              sessions.push(d.toISOString());
-          }
-      }
-      onCreateClass({
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          google_meet_link: formData.googleMeetLink,
-          instructor_id: formData.instructorId, 
-          type: classType,
-          sessions: sessions,
-          is_active: true
-      });
-      setShowForm(false);
-  };
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '' });
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <div className="flex gap-2">
-               <button onClick={() => setActiveTab('classes')} className={`px-4 py-2 rounded font-medium ${activeTab === 'classes' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 border'}`}>Urus Kelas</button>
-               <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded font-medium flex items-center gap-2 ${activeTab === 'settings' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 border'}`}><Settings size={18} /> Tetapan</button>
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // Pass instructorId automatically
+        onCreateClass({ ...formData, instructorId: user.id });
+        setShowForm(false);
+        setFormData({ title: '', price: '', link: '', description: '', schedule: '' });
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h1 className="text-2xl font-bold flex items-center gap-2"><GraduationCap className="text-emerald-600"/> Dashboard Pengajar</h1>
+                    <p className="text-gray-500 text-sm">Selamat datang, Ustaz {user.name}</p>
+                </div>
+                <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-emerald-700 transition shadow-sm">
+                    {showForm ? <XCircle size={18}/> : <Plus size={18}/>} 
+                    {showForm ? 'Batal' : 'Buka Kelas Baru'}
+                </button>
             </div>
-        </div>
 
-        {activeTab === 'settings' ? (
-          <AdminSettings />
-        ) : (
-          <>
-            <div className="flex justify-end mb-6">
-              <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded flex items-center gap-2"><Plus size={18}/> Tambah Kelas</button>
-            </div>
             {showForm && (
-                <div className="bg-white p-6 rounded shadow mb-6 animate-fade-in-up">
-                    <h3 className="text-lg font-bold mb-4">Butiran Kelas Baru</h3>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tajuk</label>
-                            <input className="border w-full p-2 rounded" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required />
+                <div className="bg-white p-6 rounded-xl shadow-md border mb-8 animate-fade-in-up">
+                    <h3 className="font-bold mb-4 text-lg border-b pb-2">Maklumat Kelas Baru</h3>
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Talaqqi" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Harga (RM)</label>
-                            <input type="number" className="border w-full p-2 rounded" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required />
+                            <label className="block text-sm font-medium mb-1">Jadual / Masa</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Isnin & Khamis, 9:00 Malam" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Instructor ID (UUID)</label>
-                            <input className="border w-full p-2 rounded" value={formData.instructorId} onChange={e=>setFormData({...formData, instructorId: e.target.value})} placeholder="Paste UUID Ustaz" required />
+                            <label className="block text-sm font-medium mb-1">Yuran (RM)</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mula</label>
-                            <input type="datetime-local" className="border w-full p-2 rounded" value={formData.startDate} onChange={e=>setFormData({...formData, startDate: e.target.value})} required />
+                             <label className="block text-sm font-medium mb-1">Google Meet Link</label>
+                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">GMeet Link</label>
-                            <input className="border w-full p-2 rounded" value={formData.googleMeetLink} onChange={e=>setFormData({...formData, googleMeetLink: e.target.value})} />
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Penerangan</label>
+                            <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
                         </div>
-                        <div className="col-span-2">
-                            <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded w-full font-bold">Simpan Kelas</button>
-                        </div>
+                        <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Terbitkan Kelas</button>
                     </form>
                 </div>
             )}
-            <div className="bg-white rounded shadow overflow-hidden">
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* My Classes List */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Kelas Anda</h3>
+                    <div className="overflow-y-auto max-h-[400px]">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th className="p-3 text-left">Nama Kelas</th>
+                                    <th className="p-3 text-left">Jadual</th>
+                                    <th className="p-3 text-right">Yuran</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {myClasses.map((c: any) => (
+                                    <tr key={c.id} className="border-b">
+                                        <td className="p-3 font-medium">{c.title}</td>
+                                        <td className="p-3 text-gray-500">{c.schedule}</td>
+                                        <td className="p-3 text-right">RM {c.price}</td>
+                                    </tr>
+                                ))}
+                                {myClasses.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada kelas.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Students List */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Users size={20} className="text-emerald-600"/> Senarai Pelajar</h3>
+                    <div className="overflow-y-auto max-h-[400px]">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th className="p-3 text-left">ID Pelajar</th>
+                                    <th className="p-3 text-left">Kelas Diambil</th>
+                                    <th className="p-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {enrollments.map((e: any) => {
+                                    // Find class name
+                                    const cls = classes.find((c:any) => c.id === e.classId);
+                                    return (
+                                        <tr key={e.id} className="border-b">
+                                            <td className="p-3 font-mono text-xs">{e.userId.substring(0,8)}...</td>
+                                            <td className="p-3">{cls ? cls.title : 'Unknown'}</td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {e.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                                {enrollments.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada pelajar berdaftar.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const AdminDashboard = ({ classes, onCreateClass }: any) => {
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onCreateClass(formData);
+        setShowForm(false);
+        setFormData({ title: '', price: '', link: '', description: '', schedule: '' });
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold flex items-center gap-2"><Database className="text-emerald-600"/> Admin Dashboard</h1>
+                <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-emerald-700 transition shadow-sm">
+                    {showForm ? <XCircle size={18}/> : <Plus size={18}/>} 
+                    {showForm ? 'Batal' : 'Tambah Kelas'}
+                </button>
+            </div>
+
+            {showForm && (
+                <div className="bg-white p-6 rounded-xl shadow-md border mb-6 animate-fade-in-up">
+                    <h3 className="font-bold mb-4 text-lg border-b pb-2">Butiran Kelas Baru</h3>
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Iqra" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Jadual / Masa</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Setiap Jumaat, 9:00 PM" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Harga (RM)</label>
+                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium mb-1">Google Meet Link</label>
+                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Penerangan</label>
+                            <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut mengenai kelas..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
+                        </div>
+                        <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Simpan ke Google Sheet</button>
+                    </form>
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <table className="min-w-full">
-                    <thead className="bg-gray-50"><tr><th className="p-3 text-left">Kelas</th><th className="p-3 text-left">Harga</th><th className="p-3 text-left">Status</th></tr></thead>
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="p-4 text-left font-semibold text-gray-600">Kelas</th>
+                            <th className="p-4 text-left font-semibold text-gray-600">Jadual</th>
+                            <th className="p-4 text-left font-semibold text-gray-600">Harga</th>
+                            <th className="p-4 text-left font-semibold text-gray-600">Status</th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        {classes.map(c => (
+                        {classes.length === 0 && (
+                            <tr><td colSpan={4} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
+                        )}
+                        {classes.map((c: any) => (
                             <tr key={c.id} className="border-b hover:bg-gray-50">
-                                <td className="p-3 font-medium">{c.title}</td>
-                                <td className="p-3 text-emerald-600 font-bold">RM {c.price}</td>
-                                <td className="p-3">
-                                  <span className={`px-2 py-1 rounded text-xs font-bold ${c.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                    {c.isActive ? 'Aktif' : 'Tutup'}
-                                  </span>
-                                </td>
+                                <td className="p-4 font-medium">{c.title}</td>
+                                <td className="p-4 text-gray-500 text-sm">{c.schedule}</td>
+                                <td className="p-4 text-emerald-600 font-bold">RM {c.price}</td>
+                                <td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase">Aktif</span></td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
-          </>
-        )}
-    </div>
-  );
-}
-
-const StudentPortal = ({ 
-  user, 
-  classes, 
-  enrollments, 
-  onEnroll, 
-  onPay 
-}: { 
-  user: Profile, 
-  classes: ClassSession[], 
-  enrollments: Enrollment[], 
-  onEnroll: (classId: string) => void,
-  onPay: (enrollmentId: string) => void
-}) => {
-    const myEnrolls = enrollments.filter(e => e.userId === user.id);
-    const myClassIds = myEnrolls.map(e => e.classId);
-
-    return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6">Portal Pelajar: {user.name}</h1>
-            
-            <div className="mb-12">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <BookOpen size={20} className="text-emerald-600"/> Senarai Kelas Ditawarkan
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {classes.length === 0 ? (
-                        <div className="col-span-1 md:col-span-3 text-center py-12 bg-white rounded-lg shadow border border-dashed border-gray-300">
-                            <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                            <h3 className="text-lg font-medium text-gray-900">Tiada Kelas Ditemui</h3>
-                            <p className="text-gray-500">Belum ada kelas yang dibuka buat masa ini.</p>
-                        </div>
-                    ) : classes.map(cls => {
-                        const enrolled = myClassIds.includes(cls.id);
-                        return (
-                            <div key={cls.id} className="bg-white p-6 rounded shadow border">
-                                <h3 className="font-bold text-lg">{cls.title}</h3>
-                                <div className="text-xs text-emerald-600 font-semibold mb-1 uppercase tracking-wide">{cls.type}</div>
-                                <p className="text-emerald-600 font-bold text-xl">RM {cls.price}</p>
-                                <p className="text-gray-600 text-sm my-2">{cls.description}</p>
-                                {enrolled ? (
-                                    <button disabled className="w-full bg-gray-200 text-gray-500 py-2 rounded mt-2 cursor-not-allowed">Sudah Daftar</button>
-                                ) : (
-                                    <button onClick={() => onEnroll(cls.id)} className="w-full bg-emerald-600 text-white py-2 rounded mt-2 hover:bg-emerald-700">Daftar Sekarang</button>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-
-            <div>
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Inbox size={20} className="text-emerald-600"/> Kelas Saya
-                </h2>
-                <div className="space-y-4">
-                    {myEnrolls.length === 0 ? (
-                        <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                             <p className="text-gray-500">Anda belum mendaftar sebarang kelas.</p>
-                             <p className="text-sm text-gray-400">Sila pilih kelas di atas untuk mula belajar.</p>
-                        </div>
-                    ) : myEnrolls.map(e => {
-                        const cls = classes.find(c => c.id === e.classId);
-                        if(!cls) return null;
-                        return (
-                            <div key={e.id} className="bg-white p-4 rounded shadow border flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-bold">{cls.title}</h4>
-                                    <span className={`text-xs px-2 py-1 rounded ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{e.status}</span>
-                                </div>
-                                {e.status === 'Paid' ? (
-                                    <a href={cls.googleMeetLink} target="_blank" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-                                        <Video size={16} /> Masuk Meet
-                                    </a>
-                                ) : (
-                                    <button onClick={() => onPay(e.id)} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 flex items-center gap-2">
-                                        <CreditCard size={16} /> Bayar Sekarang
-                                    </button>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
             </div>
         </div>
     )
@@ -835,334 +608,105 @@ const StudentPortal = ({
 
 const App = () => {
   const [user, setUser] = useState<Profile | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [classes, setClasses] = useState<ClassSession[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  
-  const [loading, setLoading] = useState(true);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState('');
 
-  // --- 1. Fetch Auth Session & Profile ---
+  // Initial Load
   useEffect(() => {
-    let mounted = true;
+    // Check local storage for simple persist
+    const stored = localStorage.getItem('currentUser');
+    if (stored) setUser(JSON.parse(stored));
 
-    const initApp = async () => {
-        try {
-            setLoading(true);
-            setConnectionError(null);
+    fetchData();
+  }, []);
 
-            let session = null;
-            try {
-               const { data } = await supabase.auth.getSession();
-               session = data.session;
-            } catch (err) {
-               console.warn("Session retrieval failed:", err);
-            }
-
-            if (session) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-                
-                if (profile && mounted) setUser(profile);
-            }
-
-            await fetchData(session?.user?.id);
-
-        } catch (error: any) {
-            console.error("Initialization error:", error);
-            if (mounted) setConnectionError("Error initializing app: " + (error.message || "Unknown Error"));
-        } finally {
-            if (mounted) setLoading(false);
-        }
-    };
-
-    initApp();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session) {
-             const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-             if(profile) setUser(profile);
-             fetchData(session.user.id);
-        } else {
-            setUser(null);
-            fetchData(null);
-        }
-    });
-
-    return () => {
-        mounted = false;
-        subscription.unsubscribe();
-    };
-  }, [retryCount]); 
-
-  // --- 2. Fetch Data with FALLBACK Strategy ---
-  const fetchData = async (userId: string | null | undefined) => {
-      try {
-        // A. Try Standard SDK
-        const { data: classesData, error: classesError } = await supabase
-            .from('classes')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (classesError) throw classesError;
-
-        if (classesData) {
-            mapAndSetClasses(classesData);
-        } else {
-            setClasses([]);
-        }
-
-        // Fetch Enrollments (SDK)
-        if (userId) {
-            const { data: enrollData } = await supabase.from('enrollments').select('*');
-            if (enrollData) {
-                mapAndSetEnrollments(enrollData);
-            }
-        }
-      } catch (sdkError: any) {
-          console.warn("SDK Fetch Failed, attempting Direct REST fallback...", sdkError);
-          
-          // B. Fallback to Direct REST Fetch
-          // This bypasses SDK issues (dependency, build env) and just uses browser native fetch
-          try {
-             const headers = {
-                 'apikey': SUPABASE_ANON_KEY,
-                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-             };
-             
-             // Fetch Classes
-             const classRes = await fetch(`${SUPABASE_URL}/rest/v1/classes?select=*&order=created_at.desc`, { headers });
-             if (!classRes.ok) {
-                 if (classRes.status === 503) throw new Error("Database Paused (503). Service Unavailable.");
-                 throw new Error(`REST Error: ${classRes.status} ${classRes.statusText}`);
-             }
-             const classJson = await classRes.json();
-             mapAndSetClasses(classJson);
-             
-             setConnectionError(`Connected via Fallback (SDK Error: ${sdkError.message})`);
-
-             // Fetch Enrollments (Only if user is known - hard to do with REST securely without token management manually, so skip for fallback)
-             // Login probably won't work if SDK fails anyway, so this at least shows the landing page.
-
-          } catch (restError: any) {
-              console.error("All fetch methods failed.");
-              setConnectionError(`Connection FAILED. SDK: ${sdkError.message}. REST: ${restError.message}`);
-          }
-      }
-  };
-
-  const mapAndSetClasses = (data: any[]) => {
-      const mappedClasses: ClassSession[] = data.map(c => ({
-          id: c.id,
-          title: c.title,
-          description: c.description,
-          sessions: c.sessions,
-          price: c.price,
-          googleMeetLink: c.google_meet_link,
-          isActive: c.is_active,
-          type: c.type,
-          instructorId: c.instructor_id,
-          instructorName: c.instructor_name || 'Ustaz'
-      }));
-      setClasses(mappedClasses);
-  };
-
-  const mapAndSetEnrollments = (data: any[]) => {
-      const mappedEnrolls: Enrollment[] = data.map(e => ({
-          id: e.id,
-          userId: e.user_id,
-          classId: e.class_id,
-          status: e.status,
-          transactionId: e.transaction_id
-      }));
-      setEnrollments(mappedEnrolls);
-  };
-
-  const handleLogout = async () => {
-    setUser(null);
+  const fetchData = async () => {
+    if (!GOOGLE_SCRIPT_URL) return;
+    setLoading(true);
+    setFetchError('');
     try {
-        await supabase.auth.signOut();
-    } catch (error) {
-        console.error("Logout error:", error);
-    } finally {
-        window.location.href = '/'; 
-    }
-  };
-
-  const handleCreateClass = async (newClassData: any) => {
-      if(!user) return;
-      const { error } = await supabase.from('classes').insert([newClassData]);
-      if (error) alert(error.message);
-      else {
-          alert("Kelas berjaya dicipta!");
-          setRetryCount(prev => prev + 1); 
-      }
-  };
-
-  const handleEnroll = async (classId: string) => {
-    if (!user) {
-        setIsAuthModalOpen(true);
-        return;
-    }
-    
-    if (enrollments.some(e => e.userId === user.id && e.classId === classId)) {
-        alert("Sudah mendaftar.");
-        return;
-    }
-
-    const { error } = await supabase.from('enrollments').insert([{
-        user_id: user.id,
-        class_id: classId,
-        status: 'Unpaid'
-    }]);
-
-    if (error) alert(error.message);
-    else {
-        alert("Pendaftaran berjaya!");
-        setRetryCount(prev => prev + 1); 
-    }
-  };
-
-  const handlePay = async (enrollmentId: string) => {
-    if(!user) return;
-    const enrollment = enrollments.find(e => e.id === enrollmentId);
-    if (!enrollment) return;
-    const cls = classes.find(c => c.id === enrollment.classId);
-    if (!cls) return;
-
-    try {
-        const response = await fetch('/api/payment/create-bill', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                enrollmentId: enrollmentId,
-                name: user.name,
-                email: user.email,
-                phone: user.phone || '0123456789',
-                amount: cls.price,
-                title: cls.title
-            })
-        });
-
-        const data = await response.json() as any;
-        if (response.ok && data.paymentUrl) {
-            window.location.href = data.paymentUrl;
-        } else {
-            alert(`Ralat pembayaran: ${data.error || 'Sila cuba lagi'}`);
-        }
+        const data = await apiCall('getData');
+        if (data.classes) setClasses(data.classes);
+        if (data.enrollments) setEnrollments(data.enrollments);
     } catch (err: any) {
         console.error(err);
-        alert('Gagal menghubungi pelayan pembayaran.');
+        setFetchError(err.message || "Gagal menghubungi database.");
+    } finally {
+        setLoading(false);
     }
   };
 
-  if (loading) {
-      return (
-        <div className="flex h-screen flex-col items-center justify-center gap-4 bg-slate-50">
-            <Loader2 className="animate-spin h-12 w-12 text-emerald-600"/>
-            <p className="text-gray-500 font-medium animate-pulse">Sedang memuatkan data...</p>
-        </div>
-      );
+  const handleCreateClass = async (data: any) => {
+      setLoading(true);
+      try {
+          await apiCall('createClass', data, 'POST');
+          alert("Kelas berjaya ditambah!");
+          fetchData(); // Refresh
+      } catch (err: any) { alert(err.message); }
+      finally { setLoading(false); }
+  }
+
+  const handleEnroll = async (classId: string) => {
+      if(!user) return setIsAuthOpen(true);
+      if (enrollments.some(e => e.userId === user.id && e.classId === classId)) {
+          alert("Anda sudah mendaftar untuk kelas ini.");
+          return;
+      }
+      setLoading(true);
+      try {
+          await apiCall('enroll', { userId: user.id, classId }, 'POST');
+          alert("Berjaya daftar! Sila buat pembayaran di tab Kelas Saya.");
+          fetchData();
+      } catch(err: any) { alert(err.message); }
+      finally { setLoading(false); }
+  }
+
+  const handlePay = async (enrollId: string) => {
+      // Mock Payment for Google Sheet version: Confirm dialog acting as payment gateway
+      if(confirm("Sahkan pembayaran manual (Demo)?\nKlik OK untuk menandakan sebagai 'Paid'.")) {
+          setLoading(true);
+          try {
+             await apiCall('pay', { enrollId }, 'POST');
+             alert("Pembayaran berjaya direkodkan!");
+             fetchData();
+          } catch(err: any) { alert(err.message); }
+          finally { setLoading(false); }
+      }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
-      <Navbar 
-        user={user} 
-        onOpenAuth={() => setIsAuthModalOpen(true)} 
-        onLogout={handleLogout} 
-      />
+      <Navbar user={user} onOpenAuth={() => setIsAuthOpen(true)} onLogout={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} />
       
-      {/* Detailed Connection Error Banner */}
-      {connectionError && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 m-4 rounded shadow-sm" role="alert">
-              <div className="flex items-center gap-2">
-                <WifiOff className="h-5 w-5"/>
-                <p className="font-bold">Status Sambungan: Tidak Stabil</p>
-              </div>
-              <p className="text-sm mt-1 break-words font-mono bg-red-100 p-2 rounded mt-2">{connectionError}</p>
-              <div className="mt-2 flex gap-2">
-                 <button onClick={()=>setRetryCount(c=>c+1)} className="text-xs bg-red-200 px-3 py-1 rounded hover:bg-red-300 font-bold border border-red-300">
-                    Cuba Semula (Retry)
-                 </button>
-                 <button onClick={()=>window.location.reload()} className="text-xs bg-white px-3 py-1 rounded hover:bg-gray-100 font-bold border border-gray-300">
-                    Reload Page
-                 </button>
-              </div>
+      {loading && <div className="fixed top-20 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg flex gap-3 items-center z-[100] animate-bounce"><Loader2 className="animate-spin" size={20}/> Memproses data...</div>}
+      
+      {fetchError && (
+          <div className="max-w-7xl mx-auto mt-4 px-4">
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center justify-between">
+                <span className="flex items-center gap-2"><AlertCircle size={20}/> {fetchError}</span>
+                <button onClick={fetchData} className="bg-white border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-sm flex items-center gap-1"><RefreshCw size={14}/> Cuba Lagi</button>
+            </div>
           </div>
       )}
 
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLogin={setUser} />
 
-      {!user && (
-        <LandingPage classes={classes} onOpenAuth={() => setIsAuthModalOpen(true)} />
-      )}
+      {!user && <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />}
 
-      {user && user.role === 'admin' && (
-        <AdminDashboard 
-          classes={classes} 
-          enrollments={enrollments} 
-          onCreateClass={handleCreateClass} 
-        />
-      )}
+      {user && user.role === 'admin' && <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />}
+      
+      {user && user.role === 'ustaz' && <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />}
 
-      {user && user.role === 'ustaz' && (
-        <InstructorDashboard 
-          user={user}
-          classes={classes} 
-          enrollments={enrollments} 
-        />
-      )}
-
-      {user && user.role === 'student' && (
-        <StudentPortal 
-          user={user} 
-          classes={classes} 
-          enrollments={enrollments} 
-          onEnroll={handleEnroll}
-          onPay={handlePay}
-        />
-      )}
-
-      {/* --- DEBUG STATUS PANEL (Always show if error, or togglable) --- */}
-      {(classes.length === 0 || connectionError) && (
-        <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur text-slate-300 text-xs p-4 border-t border-slate-700 font-mono z-[100] transition-all">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex-1">
-                    <strong className="text-white block mb-1 flex items-center gap-2">
-                        <AlertTriangle size={14} className={connectionError ? "text-red-500" : "text-yellow-500"}/> 
-                        System Diagnostics
-                    </strong>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 mt-2">
-                        <span>Classes Loaded: <span className="text-white font-bold">{classes.length}</span></span>
-                        <span>Supabase URL: {SUPABASE_URL.substring(0, 20)}...</span>
-                        <span className={connectionError ? "text-red-400 font-bold" : "text-green-400"}>
-                            Status: {connectionError ? 'ERROR' : 'OK'}
-                        </span>
-                        <span>React Version: {React.version}</span>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                     <button onClick={() => {
-                        const win = window.open(SUPABASE_URL, '_blank');
-                        win?.focus();
-                     }} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded flex items-center gap-1">
-                        <Globe size={12}/> Check DB Status
-                    </button>
-                    <button onClick={() => setRetryCount(c => c+1)} className="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-1">
-                        <RefreshCw size={12}/> Force Retry
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
+      {user && user.role === 'student' && <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />}
+    
+      {/* Footer / Debug Info */}
+      <div className="text-center py-8 text-gray-400 text-xs">
+         <p>Powered by Google Apps Script Database</p>
+         <p className="mt-1">Version 2.0 (No-SQL)</p>
+      </div>
     </div>
   );
 };

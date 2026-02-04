@@ -13,6 +13,13 @@
     .font-arabic {
       font-family: 'Amiri', serif;
     }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.3s ease-out;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 <script type="importmap">
 {
@@ -20,8 +27,7 @@
     "react-dom/": "https://esm.sh/react-dom@18.2.0/",
     "lucide-react": "https://esm.sh/lucide-react@0.294.0",
     "react/": "https://esm.sh/react@18.2.0/",
-    "react": "https://esm.sh/react@18.2.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7"
+    "react": "https://esm.sh/react@18.2.0"
   }
 }
 </script>

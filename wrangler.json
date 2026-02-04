@@ -8,9 +8,6 @@
     "enabled": true
   },
   "vars": {
-    "VITE_SUPABASE_URL": "https://amdfwcintewpjukgmwve.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc",
-    "TOYYIBPAY_URL": "https://dev.toyyibpay.com",
-    "SUPABASE_SERVICE_ROLE_KEY": "gantikan-dengan-service-role-key-dari-supabase-settings"
+    "APP_MODE": "google-sheet-backend"
   }
 }
