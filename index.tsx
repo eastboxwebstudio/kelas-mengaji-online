@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -34,25 +34,34 @@ import {
   Loader2,
   Inbox,
   Settings,
-  Save
+  Save,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 
 // --- SUPABASE CONFIGURATION ---
-// NOTA: Dalam projek sebenar (Vite/Next.js), nilai ini akan dibaca dari fail .env
-// Untuk memastikan aplikasi ini berjalan lancar sekarang, nilai 'fallback' diisi terus.
 
 const getEnv = (key: string) => {
   try {
+    // Check both standard Vite env and generic process.env for compatibility
     return (import.meta as any).env?.[key];
   } catch (e) {
     return undefined;
   }
 };
 
+// Gunakan nilai hardcoded sebagai fallback terakhir jika ENV gagal
 const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://amdfwcintewpjukgmwve.supabase.co';
 const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Konfigurasi Client dengan tetapan 'persistSession' yang betul untuk browser
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 // --- Types & Interfaces ---
 
@@ -171,6 +180,13 @@ const AuthModal = ({
     setIsLoading(true);
 
     try {
+      // Test connection first
+      const { error: pingError } = await supabase.from('classes').select('id').limit(1);
+      if (pingError && pingError.code !== 'PGRST116') { // Ignore empty result error
+         console.warn("Auth Ping Error:", pingError);
+         // We continue anyway, as auth might work even if data fetch fails, but it's a good warning.
+      }
+
       if (isRegistering) {
         // --- REAL SUPABASE SIGNUP ---
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -201,7 +217,11 @@ const AuthModal = ({
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Ralat berlaku. Sila cuba lagi.");
+      if (err.message === 'Failed to fetch') {
+          setError("Gagal menyambung ke server. Sila periksa sambungan internet anda.");
+      } else {
+          setError(err.message || "Ralat berlaku. Sila cuba lagi.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -874,105 +894,129 @@ const App = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [classes, setClasses] = useState<ClassSession[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  
+  // State kawalan untuk loading dan ralat
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // --- 1. Fetch Auth Session & Profile ---
   useEffect(() => {
-    // Safety Timer: Jika Supabase tak respond dalam 2 saat, force loading stop
-    const timer = setTimeout(() => {
-      console.log("Loading taking too long, forcing render...");
-      setLoading(false);
-    }, 2000);
+    let mounted = true;
 
-    const checkSession = async () => {
+    const initApp = async () => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            setLoading(true);
+            setConnectionError(null);
+
+            // 1. Check Session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+                console.warn("Session check warning (might be offline):", sessionError);
+                // Don't throw here, allowing guest view if session check fails but data fetch works
+            }
+
             if (session) {
-                // Fetch profile data
-                const { data: profile } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
                 
-                if (profile) setUser(profile);
+                if (profile && mounted) setUser(profile);
             }
-        } catch (error) {
-            console.error("Session check error:", error);
+
+            // 2. Fetch Initial Data (Classes)
+            // We use this as a connection test. If this fails, we assume network/db is down.
+            await fetchData(session?.user?.id);
+
+        } catch (error: any) {
+            console.error("Initialization error:", error);
+            if (mounted) setConnectionError("Gagal menghubungi pangkalan data. Sila pastikan internet anda stabil.");
         } finally {
-            clearTimeout(timer); // Clear timer if successful early
-            setLoading(false);
+            if (mounted) setLoading(false);
         }
     };
-    checkSession();
+
+    initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session) {
              const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
              if(profile) setUser(profile);
+             fetchData(session.user.id);
         } else {
             setUser(null);
+            fetchData(null);
         }
-        setLoading(false); // Ensure loading stops on state change
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+        mounted = false;
+        subscription.unsubscribe();
+    };
+  }, [retryCount]); // Re-run when retryCount changes
 
   // --- 2. Fetch Data (Classes & Enrollments) ---
-  const fetchData = async () => {
-      // Fetch Classes
-      const { data: classesData } = await supabase.from('classes').select('*').order('created_at', { ascending: false });
-      if (classesData) {
-          // Map DB snake_case to CamelCase
-          const mappedClasses: ClassSession[] = classesData.map(c => ({
-              id: c.id,
-              title: c.title,
-              description: c.description,
-              sessions: c.sessions,
-              price: c.price,
-              googleMeetLink: c.google_meet_link,
-              isActive: c.is_active,
-              type: c.type,
-              instructorId: c.instructor_id,
-              instructorName: c.instructor_name || 'Ustaz'
-          }));
-          setClasses(mappedClasses);
-      }
+  const fetchData = async (userId: string | null | undefined) => {
+      try {
+        // Fetch Classes with timeout signal to prevent hanging indefinitely
+        // Note: JS fetch timeout is complex, so we rely on supabase-js handling or network failure
+        const { data: classesData, error: classesError } = await supabase
+            .from('classes')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (classesError) throw classesError;
 
-      // Fetch Enrollments (If Admin or Ustaz, fetch all relevant. If student, fetch own)
-      // For simplicity in this demo, we fetch all and filter in frontend, 
-      // but in production use RLS and selective fetching.
-      if (user) {
-          const { data: enrollData } = await supabase.from('enrollments').select('*');
-          if (enrollData) {
-               const mappedEnrolls: Enrollment[] = enrollData.map(e => ({
-                   id: e.id,
-                   userId: e.user_id,
-                   classId: e.class_id,
-                   status: e.status,
-                   transactionId: e.transaction_id
-               }));
-               setEnrollments(mappedEnrolls);
-          }
+        if (classesData) {
+            const mappedClasses: ClassSession[] = classesData.map(c => ({
+                id: c.id,
+                title: c.title,
+                description: c.description,
+                sessions: c.sessions,
+                price: c.price,
+                googleMeetLink: c.google_meet_link,
+                isActive: c.is_active,
+                type: c.type,
+                instructorId: c.instructor_id,
+                instructorName: c.instructor_name || 'Ustaz'
+            }));
+            setClasses(mappedClasses);
+        }
+
+        // Fetch Enrollments if user exists
+        if (userId) {
+            const { data: enrollData, error: enrollError } = await supabase.from('enrollments').select('*');
+            if (enrollError) console.warn("Enrollment fetch error:", enrollError); // Non-critical
+            
+            if (enrollData) {
+                const mappedEnrolls: Enrollment[] = enrollData.map(e => ({
+                    id: e.id,
+                    userId: e.user_id,
+                    classId: e.class_id,
+                    status: e.status,
+                    transactionId: e.transaction_id
+                }));
+                setEnrollments(mappedEnrolls);
+            }
+        }
+      } catch (err: any) {
+          console.error("Fetch Data Error:", err);
+          throw err; // Propagate to initApp to trigger error screen
       }
   };
 
-  useEffect(() => {
-      fetchData();
-  }, [user]); // Re-fetch when user logs in
-
   const handleLogout = async () => {
-    // 1. Optimistic UI update: Clear user immediately
+    // 1. Optimistic UI update
     setUser(null);
 
     try {
-        // 2. Perform Supabase logout
         await supabase.auth.signOut();
     } catch (error) {
         console.error("Logout error:", error);
     } finally {
-        // 3. Force hard refresh/redirect to ensure clean state
         window.location.href = '/'; 
     }
   };
@@ -983,7 +1027,7 @@ const App = () => {
       if (error) alert(error.message);
       else {
           alert("Kelas berjaya dicipta!");
-          fetchData();
+          setRetryCount(prev => prev + 1); // Trigger re-fetch
       }
   };
 
@@ -993,7 +1037,6 @@ const App = () => {
         return;
     }
     
-    // Check local duplicate first
     if (enrollments.some(e => e.userId === user.id && e.classId === classId)) {
         alert("Sudah mendaftar.");
         return;
@@ -1008,14 +1051,13 @@ const App = () => {
     if (error) alert(error.message);
     else {
         alert("Pendaftaran berjaya!");
-        fetchData();
+        setRetryCount(prev => prev + 1); // Trigger re-fetch
     }
   };
 
   const handlePay = async (enrollmentId: string) => {
     if(!user) return;
     
-    // Find class data to get amount
     const enrollment = enrollments.find(e => e.id === enrollmentId);
     if (!enrollment) return;
     
@@ -1023,7 +1065,6 @@ const App = () => {
     if (!cls) return;
 
     try {
-        // Call Cloudflare Function
         const response = await fetch('/api/payment/create-bill', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1040,7 +1081,6 @@ const App = () => {
         const data = await response.json() as any;
         
         if (response.ok && data.paymentUrl) {
-            // Redirect user to ToyyibPay
             window.location.href = data.paymentUrl;
         } else {
             alert(`Ralat pembayaran: ${data.error || 'Sila cuba lagi'}`);
@@ -1051,7 +1091,42 @@ const App = () => {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-10 w-10 text-emerald-600"/></div>;
+  // --- RENDER STATES ---
+
+  if (loading) {
+      return (
+        <div className="flex h-screen flex-col items-center justify-center gap-4 bg-slate-50">
+            <Loader2 className="animate-spin h-12 w-12 text-emerald-600"/>
+            <p className="text-gray-500 font-medium animate-pulse">Sedang memuatkan data...</p>
+        </div>
+      );
+  }
+
+  // Fallback Error Screen if Supabase is unreachable
+  if (connectionError && classes.length === 0) {
+      return (
+        <div className="flex h-screen flex-col items-center justify-center gap-6 bg-slate-50 p-6 text-center">
+            <div className="bg-red-100 p-6 rounded-full">
+                <WifiOff className="h-16 w-16 text-red-500"/>
+            </div>
+            <div className="max-w-md">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Sambungan Tergendala</h2>
+                <p className="text-gray-600 mb-6">
+                    Kami menghadapi masalah menghubungi pangkalan data. Ini mungkin disebabkan oleh sambungan internet yang lemah atau server sedang penyelenggaraan (Paused).
+                </p>
+                <button 
+                    onClick={() => setRetryCount(prev => prev + 1)}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2 mx-auto"
+                >
+                    <RefreshCw size={20} /> Cuba Sambung Semula
+                </button>
+            </div>
+            <div className="text-xs text-gray-400 mt-8 border-t pt-4">
+                Debug: {connectionError}
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
@@ -1061,6 +1136,14 @@ const App = () => {
         onLogout={handleLogout} 
       />
       
+      {/* Banner for non-critical errors (e.g., failed to fetch enrollments but classes loaded) */}
+      {connectionError && (
+          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4" role="alert">
+              <p className="font-bold">Amaran Sambungan</p>
+              <p>Sesetengah data mungkin gagal dimuatkan. Sila refresh halaman jika perlu.</p>
+          </div>
+      )}
+
       <AuthModal 
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
