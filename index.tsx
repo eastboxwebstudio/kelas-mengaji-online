@@ -140,12 +140,18 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  // Default role 'student', user can change to 'ustaz'
   const [formData, setFormData] = useState<{name: string, email: string, password: string, phone: string, role: UserRole}>({ 
       name: '', email: '', password: '', phone: '', role: 'student' 
   });
 
   if (!isOpen) return null;
+
+  const sanitizeUser = (rawUser: any): Profile => {
+      return {
+          ...rawUser,
+          role: (rawUser.role || 'student').toLowerCase().trim() as UserRole
+      };
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,16 +166,17 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
         const payload = { ...formData, email, password };
         const res = await apiCall('register', payload, 'POST');
         if (res.user) {
-           localStorage.setItem('currentUser', JSON.stringify(res.user));
-           onLogin(res.user);
+           const user = sanitizeUser(res.user);
+           localStorage.setItem('currentUser', JSON.stringify(user));
+           onLogin(user);
            onClose();
         }
       } else {
-        // Use POST for login to be consistent and secure, and avoid URL encoding issues
         const res = await apiCall('login', { email, password }, 'POST');
         if (res.user) {
-            localStorage.setItem('currentUser', JSON.stringify(res.user));
-            onLogin(res.user);
+            const user = sanitizeUser(res.user);
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            onLogin(user);
             onClose();
         } else {
             setError("Emel atau kata laluan salah.");
@@ -618,10 +625,19 @@ const App = () => {
   useEffect(() => {
     // Check local storage for simple persist
     const stored = localStorage.getItem('currentUser');
-    if (stored) setUser(JSON.parse(stored));
-
+    if (stored) {
+       const u = JSON.parse(stored);
+       // Normalize role on load
+       if(u.role) u.role = u.role.toLowerCase().trim();
+       setUser(u);
+    }
     fetchData();
   }, []);
+  
+  // Refresh data when user logs in to ensure dashboard is populated
+  useEffect(() => {
+      if(user) fetchData();
+  }, [user]);
 
   const fetchData = async () => {
     if (!GOOGLE_SCRIPT_URL) return;
@@ -676,6 +692,29 @@ const App = () => {
           finally { setLoading(false); }
       }
   }
+  
+  const renderDashboard = () => {
+      if (!user) return <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />;
+      
+      const role = (user.role || '').toLowerCase().trim();
+      
+      if (role === 'admin') return <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />;
+      if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />;
+      if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
+      
+      // Fallback if role is weird
+      return (
+          <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-8 rounded-xl inline-block max-w-lg">
+                <AlertCircle size={48} className="mx-auto mb-4 text-yellow-600"/>
+                <h3 className="text-xl font-bold mb-2">Akaun Ditemui, Tetapi Peranan Tidak Dikenali</h3>
+                <p className="mb-4">Peranan anda direkodkan sebagai: <strong>'{user.role}'</strong>.</p>
+                <p className="text-sm">Sila hubungi pentadbir untuk mengemaskini peranan anda kepada 'student', 'ustaz', atau 'admin'.</p>
+                <button onClick={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} className="mt-6 bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-yellow-700">Log Keluar</button>
+            </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
@@ -694,13 +733,7 @@ const App = () => {
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLogin={setUser} />
 
-      {!user && <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />}
-
-      {user && user.role === 'admin' && <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />}
-      
-      {user && user.role === 'ustaz' && <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />}
-
-      {user && user.role === 'student' && <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />}
+      {renderDashboard()}
     
       {/* Footer / Debug Info */}
       <div className="text-center py-8 text-gray-400 text-xs">
