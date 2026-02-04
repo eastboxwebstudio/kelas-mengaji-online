@@ -36,28 +36,22 @@ import {
   Settings,
   Save,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 
 // --- SUPABASE CONFIGURATION ---
 
-const getEnv = (key: string) => {
-  try {
-    // Check both standard Vite env and generic process.env for compatibility
-    return (import.meta as any).env?.[key];
-  } catch (e) {
-    return undefined;
-  }
-};
+// PENYELESAIAN MASALAH DEPLOYMENT:
+// Kita hardcode nilai ini untuk memastikan aplikasi BERFUNGSI di Cloudflare tanpa isu Environment Variable.
+// Nilai ini diambil dari kod asal anda.
+const SUPABASE_URL = 'https://amdfwcintewpjukgmwve.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
 
-// Gunakan nilai hardcoded sebagai fallback terakhir jika ENV gagal
-const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://amdfwcintewpjukgmwve.supabase.co';
-const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
-
-// Konfigurasi Client dengan tetapan 'persistSession' yang betul untuk browser
+// Konfigurasi Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: true,
+    persistSession: true, // Penting untuk user kekal login
     autoRefreshToken: true,
     detectSessionInUrl: true
   }
@@ -79,22 +73,22 @@ interface ClassSession {
   id: string;
   title: string;
   description: string;
-  sessions: string[]; // Array of ISO date strings
+  sessions: string[]; 
   price: number;
-  googleMeetLink: string; // Mapped from google_meet_link
-  isActive: boolean; // Mapped from is_active
+  googleMeetLink: string; 
+  isActive: boolean; 
   type: 'single' | 'monthly';
-  instructorId: string; // Mapped from instructor_id
-  instructorName: string; // Mapped from instructor_name
+  instructorId: string; 
+  instructorName: string; 
 }
 
 interface Enrollment {
   id: string;
-  userId: string; // Mapped from user_id
-  classId: string; // Mapped from class_id
+  userId: string; 
+  classId: string; 
   status: 'Unpaid' | 'Paid';
-  transactionId?: string; // Mapped from transaction_id
-  billCode?: string; // Mapped from bill_code
+  transactionId?: string; 
+  billCode?: string; 
 }
 
 // --- Components ---
@@ -180,15 +174,7 @@ const AuthModal = ({
     setIsLoading(true);
 
     try {
-      // Test connection first
-      const { error: pingError } = await supabase.from('classes').select('id').limit(1);
-      if (pingError && pingError.code !== 'PGRST116') { // Ignore empty result error
-         console.warn("Auth Ping Error:", pingError);
-         // We continue anyway, as auth might work even if data fetch fails, but it's a good warning.
-      }
-
       if (isRegistering) {
-        // --- REAL SUPABASE SIGNUP ---
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -206,7 +192,6 @@ const AuthModal = ({
         setTimeout(() => onClose(), 1500);
 
       } else {
-        // --- REAL SUPABASE LOGIN ---
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
@@ -216,12 +201,8 @@ const AuthModal = ({
         onClose();
       }
     } catch (err: any) {
-      console.error(err);
-      if (err.message === 'Failed to fetch') {
-          setError("Gagal menyambung ke server. Sila periksa sambungan internet anda.");
-      } else {
-          setError(err.message || "Ralat berlaku. Sila cuba lagi.");
-      }
+      console.error("Auth Error:", err);
+      setError(err.message || "Ralat berlaku. Sila cuba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -420,7 +401,9 @@ const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenA
                 <div className="col-span-3 text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                     <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
                     <h3 className="text-lg font-medium text-gray-900">Tiada Kelas Ditemui</h3>
-                    <p className="text-gray-500">Kelas baru akan dibuka tidak lama lagi.</p>
+                    <p className="text-gray-500">
+                        Kelas baru akan dibuka tidak lama lagi.
+                    </p>
                 </div>
             ) : highlightedClasses.map(cls => (
               <div key={cls.id} className="group bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative">
@@ -466,8 +449,8 @@ const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenA
   );
 };
 
-// ... InstructorDashboard and AdminDashboard remain largely the same visual-wise but need props update
-// For brevity, I will update where data handling occurs within the main App structure and pass down
+// ... [InstructorDashboard, AdminSettings, AdminDashboard, StudentPortal same as before] ...
+// I am including them here to ensure the full file is correct.
 
 const InstructorDashboard = ({ 
     user,
@@ -478,13 +461,11 @@ const InstructorDashboard = ({
     classes: ClassSession[], 
     enrollments: Enrollment[]
   }) => {
-    // Basic implementation same as before
     const [activeTab, setActiveTab] = useState<'schedule' | 'students'>('schedule');
     const myClasses = classes.filter(c => c.instructorId === user.id);
     const myClassIds = myClasses.map(c => c.id);
     const myEnrollments = enrollments.filter(e => myClassIds.includes(e.classId));
     
-    // ... Schedule generation logic (reused) ...
      const getMySchedule = () => {
       const sessions = myClasses.flatMap(c => 
         (c.sessions || []).map((date, idx) => ({ // Safe access sessions
@@ -584,7 +565,6 @@ const AdminSettings = () => {
 
     if (error) {
        console.error("Error fetching settings:", error);
-       // Don't show alert here to avoid annoying popups on load if table empty
     }
 
     if (data) {
@@ -602,7 +582,6 @@ const AdminSettings = () => {
     setSaving(true);
     
     try {
-        // Upsert items one by one or bulk
         const updates = [
           { key: 'toyyibpay_secret_key', value: settings.toyyibpay_secret_key },
           { key: 'toyyibpay_category_code', value: settings.toyyibpay_category_code }
@@ -614,7 +593,7 @@ const AdminSettings = () => {
 
         if (error) {
             console.error(error);
-            alert('Gagal menyimpan tetapan: ' + error.message + '. Pastikan anda adalah ADMIN dan table "app_settings" wujud.');
+            alert('Gagal menyimpan tetapan: ' + error.message);
         } else {
             alert('Tetapan berjaya disimpan!');
         }
@@ -814,7 +793,6 @@ const StudentPortal = ({
   onEnroll: (classId: string) => void,
   onPay: (enrollmentId: string) => void
 }) => {
-    // Simplified logic for brevity, keeping core structure
     const myEnrolls = enrollments.filter(e => e.userId === user.id);
     const myClassIds = myEnrolls.map(e => e.classId);
 
@@ -909,16 +887,17 @@ const App = () => {
             setLoading(true);
             setConnectionError(null);
 
-            // 1. Check Session
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
-                console.warn("Session check warning (might be offline):", sessionError);
-                // Don't throw here, allowing guest view if session check fails but data fetch works
+            // 1. Check Session - Guna try catch spesifik untuk elak infinite loading
+            let session = null;
+            try {
+               const { data } = await supabase.auth.getSession();
+               session = data.session;
+            } catch (err) {
+               console.warn("Session retrieval failed:", err);
             }
 
             if (session) {
-                const { data: profile, error: profileError } = await supabase
+                const { data: profile } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', session.user.id)
@@ -928,12 +907,11 @@ const App = () => {
             }
 
             // 2. Fetch Initial Data (Classes)
-            // We use this as a connection test. If this fails, we assume network/db is down.
             await fetchData(session?.user?.id);
 
         } catch (error: any) {
             console.error("Initialization error:", error);
-            if (mounted) setConnectionError("Gagal menghubungi pangkalan data. Sila pastikan internet anda stabil.");
+            if (mounted) setConnectionError("Gagal menghubungi pangkalan data: " + (error.message || "Unknown Error"));
         } finally {
             if (mounted) setLoading(false);
         }
@@ -956,13 +934,11 @@ const App = () => {
         mounted = false;
         subscription.unsubscribe();
     };
-  }, [retryCount]); // Re-run when retryCount changes
+  }, [retryCount]); 
 
   // --- 2. Fetch Data (Classes & Enrollments) ---
   const fetchData = async (userId: string | null | undefined) => {
       try {
-        // Fetch Classes with timeout signal to prevent hanging indefinitely
-        // Note: JS fetch timeout is complex, so we rely on supabase-js handling or network failure
         const { data: classesData, error: classesError } = await supabase
             .from('classes')
             .select('*')
@@ -984,13 +960,12 @@ const App = () => {
                 instructorName: c.instructor_name || 'Ustaz'
             }));
             setClasses(mappedClasses);
+        } else {
+          setClasses([]);
         }
 
-        // Fetch Enrollments if user exists
         if (userId) {
-            const { data: enrollData, error: enrollError } = await supabase.from('enrollments').select('*');
-            if (enrollError) console.warn("Enrollment fetch error:", enrollError); // Non-critical
-            
+            const { data: enrollData } = await supabase.from('enrollments').select('*');
             if (enrollData) {
                 const mappedEnrolls: Enrollment[] = enrollData.map(e => ({
                     id: e.id,
@@ -1004,14 +979,12 @@ const App = () => {
         }
       } catch (err: any) {
           console.error("Fetch Data Error:", err);
-          throw err; // Propagate to initApp to trigger error screen
+          throw err; 
       }
   };
 
   const handleLogout = async () => {
-    // 1. Optimistic UI update
     setUser(null);
-
     try {
         await supabase.auth.signOut();
     } catch (error) {
@@ -1027,7 +1000,7 @@ const App = () => {
       if (error) alert(error.message);
       else {
           alert("Kelas berjaya dicipta!");
-          setRetryCount(prev => prev + 1); // Trigger re-fetch
+          setRetryCount(prev => prev + 1); 
       }
   };
 
@@ -1051,16 +1024,14 @@ const App = () => {
     if (error) alert(error.message);
     else {
         alert("Pendaftaran berjaya!");
-        setRetryCount(prev => prev + 1); // Trigger re-fetch
+        setRetryCount(prev => prev + 1); 
     }
   };
 
   const handlePay = async (enrollmentId: string) => {
     if(!user) return;
-    
     const enrollment = enrollments.find(e => e.id === enrollmentId);
     if (!enrollment) return;
-    
     const cls = classes.find(c => c.id === enrollment.classId);
     if (!cls) return;
 
@@ -1079,7 +1050,6 @@ const App = () => {
         });
 
         const data = await response.json() as any;
-        
         if (response.ok && data.paymentUrl) {
             window.location.href = data.paymentUrl;
         } else {
@@ -1102,45 +1072,26 @@ const App = () => {
       );
   }
 
-  // Fallback Error Screen if Supabase is unreachable
-  if (connectionError && classes.length === 0) {
-      return (
-        <div className="flex h-screen flex-col items-center justify-center gap-6 bg-slate-50 p-6 text-center">
-            <div className="bg-red-100 p-6 rounded-full">
-                <WifiOff className="h-16 w-16 text-red-500"/>
-            </div>
-            <div className="max-w-md">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Sambungan Tergendala</h2>
-                <p className="text-gray-600 mb-6">
-                    Kami menghadapi masalah menghubungi pangkalan data. Ini mungkin disebabkan oleh sambungan internet yang lemah atau server sedang penyelenggaraan (Paused).
-                </p>
-                <button 
-                    onClick={() => setRetryCount(prev => prev + 1)}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2 mx-auto"
-                >
-                    <RefreshCw size={20} /> Cuba Sambung Semula
-                </button>
-            </div>
-            <div className="text-xs text-gray-400 mt-8 border-t pt-4">
-                Debug: {connectionError}
-            </div>
-        </div>
-      );
-  }
+  // Jika error sambungan (connectionError) ATAU tiada kelas dimuatkan (walaupun tiada error explicit), paparkan status debug di footer
+  // tetapi masih benarkan UI utama dipaparkan supaya app tidak 'blank'.
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       <Navbar 
         user={user} 
         onOpenAuth={() => setIsAuthModalOpen(true)} 
         onLogout={handleLogout} 
       />
       
-      {/* Banner for non-critical errors (e.g., failed to fetch enrollments but classes loaded) */}
+      {/* Banner Error jika ada */}
       {connectionError && (
-          <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4" role="alert">
-              <p className="font-bold">Amaran Sambungan</p>
-              <p>Sesetengah data mungkin gagal dimuatkan. Sila refresh halaman jika perlu.</p>
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 m-4 rounded shadow-sm" role="alert">
+              <div className="flex items-center gap-2">
+                <WifiOff className="h-5 w-5"/>
+                <p className="font-bold">Ralat Sambungan</p>
+              </div>
+              <p className="text-sm mt-1">{connectionError}</p>
+              <button onClick={()=>setRetryCount(c=>c+1)} className="mt-2 text-xs bg-red-200 px-3 py-1 rounded hover:bg-red-300 font-bold">Cuba Lagi</button>
           </div>
       )}
 
@@ -1177,6 +1128,28 @@ const App = () => {
           onEnroll={handleEnroll}
           onPay={handlePay}
         />
+      )}
+
+      {/* --- DEBUG STATUS PANEL (Only shows if empty or error) --- */}
+      {(classes.length === 0 || connectionError) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-gray-300 text-xs p-4 border-t border-gray-700 font-mono z-[100] opacity-90 hover:opacity-100 transition-opacity">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <strong className="text-white block mb-1 flex items-center gap-2"><AlertTriangle size={12} className="text-yellow-500"/> System Status (Debug)</strong>
+                    <div>Classes Loaded: {classes.length}</div>
+                    <div>Supabase URL: {SUPABASE_URL}</div>
+                    <div>Connection Status: {connectionError ? 'FAILED' : 'OK (But Empty)'}</div>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => window.location.reload()} className="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded">
+                        Reload Page
+                    </button>
+                    <button onClick={() => setRetryCount(c => c+1)} className="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded">
+                        Force Retry Fetch
+                    </button>
+                </div>
+            </div>
+        </div>
       )}
     </div>
   );
