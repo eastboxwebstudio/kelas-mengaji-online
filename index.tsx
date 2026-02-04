@@ -41,8 +41,16 @@ import {
 // NOTA: Dalam projek sebenar (Vite/Next.js), nilai ini akan dibaca dari fail .env
 // Untuk memastikan aplikasi ini berjalan lancar sekarang, nilai 'fallback' diisi terus.
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://amdfwcintewpjukgmwve.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
+const getEnv = (key: string) => {
+  try {
+    return (import.meta as any).env?.[key];
+  } catch (e) {
+    return undefined;
+  }
+};
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || 'https://amdfwcintewpjukgmwve.supabase.co';
+const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGZ3Y2ludGV3cGp1a2dtd3ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjQwMjMsImV4cCI6MjA4NTcwMDAyM30.UbhcX2hn6YvA_M5TKSkvtlQ048gva6bydRkE19GsRuc';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -870,6 +878,12 @@ const App = () => {
 
   // --- 1. Fetch Auth Session & Profile ---
   useEffect(() => {
+    // Safety Timer: Jika Supabase tak respond dalam 2 saat, force loading stop
+    const timer = setTimeout(() => {
+      console.log("Loading taking too long, forcing render...");
+      setLoading(false);
+    }, 2000);
+
     const checkSession = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -886,6 +900,7 @@ const App = () => {
         } catch (error) {
             console.error("Session check error:", error);
         } finally {
+            clearTimeout(timer); // Clear timer if successful early
             setLoading(false);
         }
     };
