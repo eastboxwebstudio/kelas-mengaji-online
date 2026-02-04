@@ -147,11 +147,18 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
   if (!isOpen) return null;
 
   const sanitizeUser = (rawUser: any): Profile => {
-      // Safely handle role casting
-      const roleStr = rawUser.role ? String(rawUser.role) : 'student';
+      // Safely handle role casting and prevent crash if role is numeric (corrupted data)
+      let roleStr = 'student';
+      if (rawUser.role) {
+          const r = String(rawUser.role).toLowerCase().trim();
+          // Validation: Role must be a valid string, not a phone number (digits)
+          if (!/^\d+$/.test(r)) {
+             roleStr = r;
+          }
+      }
       return {
           ...rawUser,
-          role: roleStr.toLowerCase().trim() as UserRole
+          role: roleStr as UserRole
       };
   }
 
@@ -165,7 +172,18 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
 
     try {
       if (isRegistering) {
-        const payload = { ...formData, email, password };
+        // WORKAROUND: The Google Apps Script backend has a bug where it swaps the 'phone' and 'role' columns when saving.
+        // To fix this from the client-side without touching the backend, we deliberately swap the keys in the payload.
+        // We send the 'role' value in the 'phone' key, and 'phone' value in the 'role' key.
+        const payload = { 
+            name: formData.name,
+            email: email, 
+            password: password,
+            // Swapping keys to handle backend bug where phone/role columns are inverted
+            phone: formData.role,
+            role: formData.phone, 
+        };
+
         const res = await apiCall('register', payload, 'POST');
         if (res.user) {
            const user = sanitizeUser(res.user);
@@ -632,8 +650,14 @@ const App = () => {
         const u = JSON.parse(stored);
         if (u) {
             // Normalize role on load safely
-            const r = u.role ? String(u.role) : 'student';
-            u.role = r.toLowerCase().trim();
+            const roleStr = u.role ? String(u.role).toLowerCase().trim() : 'student';
+            // Simple check if role looks corrupted (digits)
+            if (/^\d+$/.test(roleStr)) {
+                // corrupted data found in local storage
+                localStorage.removeItem('currentUser');
+                return;
+            }
+            u.role = roleStr;
             setUser(u);
         }
        } catch(e) { 
@@ -713,15 +737,15 @@ const App = () => {
       if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} onCreateClass={handleCreateClass} />;
       if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
       
-      // Fallback if role is weird
+      // Fallback if role is weird or corrupted data leaked through
       return (
           <div className="max-w-7xl mx-auto px-4 py-20 text-center">
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-8 rounded-xl inline-block max-w-lg">
                 <AlertCircle size={48} className="mx-auto mb-4 text-yellow-600"/>
-                <h3 className="text-xl font-bold mb-2">Akaun Ditemui, Tetapi Peranan Tidak Dikenali</h3>
+                <h3 className="text-xl font-bold mb-2">Akaun Ditemui, Tetapi Peranan Tidak Sah</h3>
                 <p className="mb-4">Peranan anda direkodkan sebagai: <strong>'{user.role}'</strong>.</p>
-                <p className="text-sm">Sila hubungi pentadbir untuk mengemaskini peranan anda kepada 'student', 'ustaz', atau 'admin'.</p>
-                <button onClick={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} className="mt-6 bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-yellow-700">Log Keluar</button>
+                <p className="text-sm">Ini mungkin disebabkan oleh kerosakan data lama. Sila daftar semula atau hubungi admin.</p>
+                <button onClick={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} className="mt-6 bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-yellow-700">Log Keluar & Daftar Semula</button>
             </div>
           </div>
       );
