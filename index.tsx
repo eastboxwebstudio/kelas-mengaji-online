@@ -24,7 +24,9 @@ import {
   Eye,
   EyeOff,
   Wand2,
-  Check
+  Check,
+  ChevronDown,
+  Phone
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -563,15 +565,9 @@ const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => 
     )
 };
 
-const InstructorDashboard = ({ user, classes, enrollments }: any) => {
-    // Determine which classes belong to this instructor.
-    // Filter classes where instructorName matches current user or if logic allows manual matching
-    // Since we don't have stable IDs in this demo, let's show all classes but highlight assigned ones if possible.
-    // For simplicity based on prompt: "only admin can create".
-    
-    // Filter logic: Show all active classes, but maybe ustaz wants to see only HIS.
-    // Since prompt didn't specify visibility restriction, just creation restriction, we show the list.
-    const myClasses = classes.filter((c:any) => c.instructorName && c.instructorName.toLowerCase().includes(user.name.toLowerCase()));
+const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
+    // Exact match for reliability using ID
+    const myClasses = classes.filter((c:any) => c.instructorId === user.id);
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -580,10 +576,7 @@ const InstructorDashboard = ({ user, classes, enrollments }: any) => {
                     <h1 className="text-2xl font-bold flex items-center gap-2"><GraduationCap className="text-emerald-600"/> Dashboard Pengajar</h1>
                     <p className="text-gray-500 text-sm">Selamat datang, Ustaz {user.name}</p>
                 </div>
-                {/* REMOVED: Create Class Button */}
             </div>
-
-            {/* REMOVED: Create Class Form */}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* My Classes List */}
@@ -606,7 +599,7 @@ const InstructorDashboard = ({ user, classes, enrollments }: any) => {
                                         <td className="p-3 text-right">RM {c.price}</td>
                                     </tr>
                                 ))}
-                                {myClasses.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada kelas ditugaskan atas nama anda ({user.name}).</td></tr>}
+                                {myClasses.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada kelas ditugaskan secara rasmi kepada anda.</td></tr>}
                             </tbody>
                         </table>
                     </div>
@@ -619,28 +612,42 @@ const InstructorDashboard = ({ user, classes, enrollments }: any) => {
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0">
                                 <tr>
-                                    <th className="p-3 text-left">ID Pelajar</th>
+                                    <th className="p-3 text-left">Pelajar</th>
                                     <th className="p-3 text-left">Kelas Diambil</th>
                                     <th className="p-3 text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {enrollments.map((e: any) => {
-                                    // Find class name
-                                    const cls = classes.find((c:any) => c.id === e.classId);
+                                    // Filter students enrolled in MY classes
+                                    const cls = myClasses.find((c:any) => c.id === e.classId);
+                                    if (!cls) return null; // Skip if not my class
+
+                                    // Find student details
+                                    const student = users?.find((u:any) => u.id === e.userId);
+
                                     return (
                                         <tr key={e.id} className="border-b">
-                                            <td className="p-3 font-mono text-xs">{e.userId.substring(0,8)}...</td>
-                                            <td className="p-3">{cls ? cls.title : 'Unknown'}</td>
-                                            <td className="p-3 text-center">
+                                            <td className="p-3">
+                                                <div className="font-bold text-gray-900">{student ? student.name : 'Nama Tidak Dijumpai'}</div>
+                                                <div className="text-xs text-gray-400 font-mono mb-1">{e.userId.substring(0,8)}...</div>
+                                                {student?.phone && (
+                                                    <div className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
+                                                        <Phone size={10} /> {student.phone}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-3 align-top pt-3">{cls.title}</td>
+                                            <td className="p-3 text-center align-top pt-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                     {e.status}
                                                 </span>
                                             </td>
                                         </tr>
                                     )
-                                })}
-                                {enrollments.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada pelajar berdaftar.</td></tr>}
+                                }).filter(Boolean)}
+                                {enrollments.filter((e:any) => myClasses.some((c:any) => c.id === e.classId)).length === 0 && 
+                                    <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada pelajar berdaftar dalam kelas anda.</td></tr>}
                             </tbody>
                         </table>
                     </div>
@@ -650,9 +657,12 @@ const InstructorDashboard = ({ user, classes, enrollments }: any) => {
     )
 }
 
-const AdminDashboard = ({ classes, onCreateClass }: any) => {
+const AdminDashboard = ({ classes, users, onCreateClass }: { classes: ClassSession[], users: Profile[], onCreateClass: (data: any) => void }) => {
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '' });
+    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '', instructorId: '' });
+
+    // Filter available instructors
+    const instructors = users.filter(u => u.role === 'ustaz');
 
     // Schedule Generator State
     const [useAutoSchedule, setUseAutoSchedule] = useState(false);
@@ -691,11 +701,30 @@ const AdminDashboard = ({ classes, onCreateClass }: any) => {
         e.preventDefault();
         onCreateClass(formData);
         setShowForm(false);
-        setFormData({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '' });
+        setFormData({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '', instructorId: '' });
         setUseAutoSchedule(false);
         setStartDay('');
         setStartTime('');
     }
+
+    const handleInstructorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedId = e.target.value;
+        const selectedInstructor = instructors.find(i => i.id === selectedId);
+        
+        if (selectedInstructor) {
+            setFormData({
+                ...formData,
+                instructorId: selectedInstructor.id,
+                instructorName: selectedInstructor.name
+            });
+        } else {
+             setFormData({
+                ...formData,
+                instructorId: '',
+                instructorName: ''
+            });
+        }
+    };
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -717,8 +746,22 @@ const AdminDashboard = ({ classes, onCreateClass }: any) => {
                         </div>
                         
                         <div>
-                            <label className="block text-sm font-medium mb-1">Nama Pengajar (Ustaz)</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Nama Ustaz yang bertugas" value={formData.instructorName} onChange={e=>setFormData({...formData, instructorName: e.target.value})} required/>
+                            <label className="block text-sm font-medium mb-1">Tugaskan Pengajar (Ustaz)</label>
+                            <div className="relative">
+                                <select 
+                                    className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white cursor-pointer" 
+                                    value={formData.instructorId} 
+                                    onChange={handleInstructorChange}
+                                    required
+                                >
+                                    <option value="">-- Pilih Ustaz Berdaftar --</option>
+                                    {instructors.map(inst => (
+                                        <option key={inst.id} value={inst.id}>{inst.name} ({inst.email})</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-3 text-gray-400 pointer-events-none" size={16}/>
+                            </div>
+                            {instructors.length === 0 && <p className="text-xs text-red-500 mt-1">Tiada akaun Ustaz dijumpai. Sila pastikan role 'ustaz' telah ditetapkan di database.</p>}
                         </div>
 
                         {/* Jadual Section */}
@@ -801,6 +844,7 @@ const App = () => {
   const [user, setUser] = useState<Profile | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [classes, setClasses] = useState<ClassSession[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]); // New State for Users list
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState('');
@@ -845,6 +889,20 @@ const App = () => {
         const data = await apiCall('getData');
         if (data.classes) setClasses(data.classes);
         if (data.enrollments) setEnrollments(data.enrollments);
+        
+        // Handle Users fetch and sanitization if backend returns it
+        if (data.users && Array.isArray(data.users)) {
+            const cleanUsers = data.users.map((u: any) => {
+                 let roleStr = 'student';
+                 // Handle the known swap bug if raw data is persistent
+                 if (u.role) {
+                     const r = String(u.role).toLowerCase().trim();
+                     if (!/^\d+$/.test(r)) roleStr = r;
+                 }
+                 return { ...u, role: roleStr };
+            });
+            setUsers(cleanUsers);
+        }
     } catch (err: any) {
         console.error(err);
         setFetchError(err.message || "Gagal menghubungi database.");
@@ -897,8 +955,8 @@ const App = () => {
       // Safe cast
       const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
       
-      if (role === 'admin') return <AdminDashboard classes={classes} onCreateClass={handleCreateClass} />;
-      if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} />;
+      if (role === 'admin') return <AdminDashboard classes={classes} users={users} onCreateClass={handleCreateClass} />;
+      if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} users={users} />;
       if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
       
       // Fallback if role is weird or corrupted data leaked through
@@ -938,7 +996,7 @@ const App = () => {
       <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
          <div className="max-w-7xl mx-auto px-4">
             <p className="font-semibold text-emerald-900 mb-2">Nur Al-Quran Digital</p>
-            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi & Kasih sayang .</p>
+            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi Google Sheets Database.</p>
          </div>
       </div>
     </div>
