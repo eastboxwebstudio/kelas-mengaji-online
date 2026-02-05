@@ -26,7 +26,8 @@ import {
   Wand2,
   Check,
   ChevronDown,
-  Phone
+  Phone,
+  ClipboardList
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -657,7 +658,8 @@ const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
     )
 }
 
-const AdminDashboard = ({ classes, users, onCreateClass }: { classes: ClassSession[], users: Profile[], onCreateClass: (data: any) => void }) => {
+const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPayment }: { classes: ClassSession[], users: Profile[], enrollments: Enrollment[], onCreateClass: (data: any) => void, onVerifyPayment: (id: string) => void }) => {
+    const [activeTab, setActiveTab] = useState<'classes' | 'orders'>('classes');
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '', instructorId: '' });
 
@@ -730,112 +732,191 @@ const AdminDashboard = ({ classes, users, onCreateClass }: { classes: ClassSessi
         <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold flex items-center gap-2"><Database className="text-emerald-600"/> Admin Dashboard</h1>
-                <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-emerald-700 transition shadow-sm">
-                    {showForm ? <XCircle size={18}/> : <Plus size={18}/>} 
-                    {showForm ? 'Batal' : 'Tambah Kelas'}
-                </button>
+                <div className="flex gap-2 bg-white rounded-lg p-1 border shadow-sm">
+                    <button onClick={() => setActiveTab('classes')} className={`px-4 py-2 text-sm font-medium rounded-md transition ${activeTab === 'classes' ? 'bg-emerald-100 text-emerald-800' : 'text-gray-500 hover:text-gray-900'}`}>
+                        Pengurusan Kelas
+                    </button>
+                    <button onClick={() => setActiveTab('orders')} className={`px-4 py-2 text-sm font-medium rounded-md transition ${activeTab === 'orders' ? 'bg-emerald-100 text-emerald-800' : 'text-gray-500 hover:text-gray-900'}`}>
+                        Pengurusan Tempahan
+                    </button>
+                </div>
             </div>
 
-            {showForm && (
-                <div className="bg-white p-6 rounded-xl shadow-md border mb-6 animate-fade-in-up">
-                    <h3 className="font-bold mb-4 text-lg border-b pb-2">Butiran Kelas Baru</h3>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Iqra" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Tugaskan Pengajar (Ustaz)</label>
-                            <div className="relative">
-                                <select 
-                                    className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white cursor-pointer" 
-                                    value={formData.instructorId} 
-                                    onChange={handleInstructorChange}
-                                    required
-                                >
-                                    <option value="">-- Pilih Ustaz Berdaftar --</option>
-                                    {instructors.map(inst => (
-                                        <option key={inst.id} value={inst.id}>{inst.name} ({inst.email})</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-3 text-gray-400 pointer-events-none" size={16}/>
-                            </div>
-                            {instructors.length === 0 && <p className="text-xs text-red-500 mt-1">Tiada akaun Ustaz dijumpai. Sila pastikan role 'ustaz' telah ditetapkan di database.</p>}
-                        </div>
+            {activeTab === 'classes' ? (
+                <>
+                    <div className="flex justify-end mb-6">
+                        <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-emerald-700 transition shadow-sm">
+                            {showForm ? <XCircle size={18}/> : <Plus size={18}/>} 
+                            {showForm ? 'Batal' : 'Tambah Kelas'}
+                        </button>
+                    </div>
 
-                        {/* Jadual Section */}
-                        <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-bold">Jadual / Masa</label>
-                                <button type="button" onClick={() => setUseAutoSchedule(!useAutoSchedule)} className="text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline">
-                                    <Wand2 size={12}/> {useAutoSchedule ? "Tulis Manual" : "Jana Jadual Automatik (4 Sesi)"}
-                                </button>
-                            </div>
-
-                            {useAutoSchedule ? (
-                                <div className="grid grid-cols-2 gap-4 mb-2 animate-fade-in-up">
-                                    <div>
-                                        <label className="text-xs text-gray-500">Tarikh Mula</label>
-                                        <input type="date" className="border w-full p-2 rounded" value={startDay} onChange={e=>setStartDay(e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-gray-500">Masa</label>
-                                        <input type="time" className="border w-full p-2 rounded" value={startTime} onChange={e=>setStartTime(e.target.value)} />
-                                    </div>
-                                    <button type="button" onClick={generateSchedule} className="col-span-2 bg-emerald-100 text-emerald-700 py-1 rounded text-sm font-bold hover:bg-emerald-200">
-                                        Jana Tarikh
-                                    </button>
+                    {showForm && (
+                        <div className="bg-white p-6 rounded-xl shadow-md border mb-6 animate-fade-in-up">
+                            <h3 className="font-bold mb-4 text-lg border-b pb-2">Butiran Kelas Baru</h3>
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Tajuk Kelas</label>
+                                    <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Kelas Iqra" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} required/>
                                 </div>
-                            ) : null}
+                                
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Tugaskan Pengajar (Ustaz)</label>
+                                    <div className="relative">
+                                        <select 
+                                            className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white cursor-pointer" 
+                                            value={formData.instructorId} 
+                                            onChange={handleInstructorChange}
+                                            required
+                                        >
+                                            <option value="">-- Pilih Ustaz Berdaftar --</option>
+                                            {instructors.map(inst => (
+                                                <option key={inst.id} value={inst.id}>{inst.name} ({inst.email})</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-3 text-gray-400 pointer-events-none" size={16}/>
+                                    </div>
+                                    {instructors.length === 0 && <p className="text-xs text-red-500 mt-1">Tiada akaun Ustaz dijumpai. Sila pastikan role 'ustaz' telah ditetapkan di database.</p>}
+                                </div>
 
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Setiap Jumaat, 9:00 PM" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
-                        </div>
+                                {/* Jadual Section */}
+                                <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-sm font-bold">Jadual / Masa</label>
+                                        <button type="button" onClick={() => setUseAutoSchedule(!useAutoSchedule)} className="text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline">
+                                            <Wand2 size={12}/> {useAutoSchedule ? "Tulis Manual" : "Jana Jadual Automatik (4 Sesi)"}
+                                        </button>
+                                    </div>
 
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Harga (RM)</label>
-                            <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
+                                    {useAutoSchedule ? (
+                                        <div className="grid grid-cols-2 gap-4 mb-2 animate-fade-in-up">
+                                            <div>
+                                                <label className="text-xs text-gray-500">Tarikh Mula</label>
+                                                <input type="date" className="border w-full p-2 rounded" value={startDay} onChange={e=>setStartDay(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-500">Masa</label>
+                                                <input type="time" className="border w-full p-2 rounded" value={startTime} onChange={e=>setStartTime(e.target.value)} />
+                                            </div>
+                                            <button type="button" onClick={generateSchedule} className="col-span-2 bg-emerald-100 text-emerald-700 py-1 rounded text-sm font-bold hover:bg-emerald-200">
+                                                Jana Tarikh
+                                            </button>
+                                        </div>
+                                    ) : null}
+
+                                    <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Setiap Jumaat, 9:00 PM" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Harga (RM)</label>
+                                    <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="50" type="number" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} required/>
+                                </div>
+                                <div>
+                                     <label className="block text-sm font-medium mb-1">Google Meet Link</label>
+                                     <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium mb-1">Penerangan</label>
+                                    <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut mengenai kelas..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
+                                </div>
+                                <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Simpan ke Google Sheet</button>
+                            </form>
                         </div>
-                        <div>
-                             <label className="block text-sm font-medium mb-1">Google Meet Link</label>
-                             <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Penerangan</label>
-                            <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut mengenai kelas..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
-                        </div>
-                        <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Simpan ke Google Sheet</button>
-                    </form>
+                    )}
+
+                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="p-4 text-left font-semibold text-gray-600">Kelas</th>
+                                    <th className="p-4 text-left font-semibold text-gray-600">Pengajar</th>
+                                    <th className="p-4 text-left font-semibold text-gray-600">Jadual</th>
+                                    <th className="p-4 text-left font-semibold text-gray-600">Harga</th>
+                                    <th className="p-4 text-left font-semibold text-gray-600">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {classes.length === 0 && (
+                                    <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
+                                )}
+                                {classes.map((c: any) => (
+                                    <tr key={c.id} className="border-b hover:bg-gray-50">
+                                        <td className="p-4 font-medium">{c.title}</td>
+                                        <td className="p-4 text-gray-500"><User size={14} className="inline mr-1"/>{c.instructorName || "-"}</td>
+                                        <td className="p-4 text-gray-500 text-sm">{c.schedule}</td>
+                                        <td className="p-4 text-emerald-600 font-bold">RM {c.price}</td>
+                                        <td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase">Aktif</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            ) : (
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden animate-fade-in-up">
+                    <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                        <h3 className="font-bold text-lg flex items-center gap-2"><ClipboardList size={20} className="text-emerald-600"/> Senarai Tempahan Pelajar</h3>
+                        <div className="text-sm text-gray-500">Jumlah: {enrollments.length}</div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-50 border-b">
+                                <tr>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-600">ID Tempahan</th>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-600">Pelajar</th>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-600">Kelas</th>
+                                    <th className="p-4 text-center text-sm font-semibold text-gray-600">Status</th>
+                                    <th className="p-4 text-center text-sm font-semibold text-gray-600">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {enrollments.length === 0 && (
+                                    <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada tempahan direkodkan.</td></tr>
+                                )}
+                                {enrollments.map((e: any) => {
+                                    const student = users.find(u => u.id === e.userId);
+                                    const cls = classes.find(c => c.id === e.classId);
+                                    
+                                    return (
+                                        <tr key={e.id} className="border-b hover:bg-gray-50">
+                                            <td className="p-4 text-xs font-mono text-gray-500">{e.id.substring(0,8)}...</td>
+                                            <td className="p-4">
+                                                <div className="font-bold text-gray-900">{student ? student.name : 'Unknown User'}</div>
+                                                <div className="text-xs text-gray-500">{student?.email}</div>
+                                                {student?.phone && <div className="text-xs text-emerald-600 flex items-center gap-1"><Phone size={10}/> {student.phone}</div>}
+                                            </td>
+                                            <td className="p-4 text-sm">
+                                                <div className="font-medium">{cls ? cls.title : 'Kelas Tidak Dijumpai'}</div>
+                                                <div className="text-xs text-gray-500">RM {cls?.price}</div>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {e.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {e.status !== 'Paid' ? (
+                                                    <button 
+                                                        onClick={() => onVerifyPayment(e.id)} 
+                                                        className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700 flex items-center gap-1 mx-auto"
+                                                        title="Sahkan Pembayaran"
+                                                    >
+                                                        <Check size={12}/> Sahkan Bayaran
+                                                    </button>
+                                                ) : (
+                                                    <div className="text-green-600 flex items-center justify-center gap-1 text-xs font-bold">
+                                                        <CheckCircle size={14}/> Selesai
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
-
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="min-w-full">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="p-4 text-left font-semibold text-gray-600">Kelas</th>
-                            <th className="p-4 text-left font-semibold text-gray-600">Pengajar</th>
-                            <th className="p-4 text-left font-semibold text-gray-600">Jadual</th>
-                            <th className="p-4 text-left font-semibold text-gray-600">Harga</th>
-                            <th className="p-4 text-left font-semibold text-gray-600">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {classes.length === 0 && (
-                            <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
-                        )}
-                        {classes.map((c: any) => (
-                            <tr key={c.id} className="border-b hover:bg-gray-50">
-                                <td className="p-4 font-medium">{c.title}</td>
-                                <td className="p-4 text-gray-500"><User size={14} className="inline mr-1"/>{c.instructorName || "-"}</td>
-                                <td className="p-4 text-gray-500 text-sm">{c.schedule}</td>
-                                <td className="p-4 text-emerald-600 font-bold">RM {c.price}</td>
-                                <td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase">Aktif</span></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
         </div>
     )
 }
@@ -948,6 +1029,18 @@ const App = () => {
           finally { setLoading(false); }
       }
   }
+
+  const handleAdminVerifyPayment = async (enrollId: string) => {
+      if(confirm("Adakah anda pasti mahu mengesahkan pembayaran ini secara manual?")) {
+          setLoading(true);
+          try {
+             await apiCall('pay', { enrollId }, 'POST');
+             alert("Status berjaya dikemaskini ke 'Paid'.");
+             fetchData();
+          } catch(err: any) { alert(err.message); }
+          finally { setLoading(false); }
+      }
+  }
   
   const renderDashboard = () => {
       if (!user) return <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />;
@@ -955,7 +1048,7 @@ const App = () => {
       // Safe cast
       const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
       
-      if (role === 'admin') return <AdminDashboard classes={classes} users={users} onCreateClass={handleCreateClass} />;
+      if (role === 'admin') return <AdminDashboard classes={classes} users={users} enrollments={enrollments} onCreateClass={handleCreateClass} onVerifyPayment={handleAdminVerifyPayment} />;
       if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} users={users} />;
       if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
       
