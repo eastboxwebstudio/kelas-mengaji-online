@@ -32,7 +32,7 @@ import {
 
 // --- CONFIGURATION ---
 
-// Sekarang kita menggunakan Cloudflare Functions (API tempatan)
+// Menggunakan Cloudflare Functions (API tempatan) dengan D1 Database
 const API_BASE_URL = "/api"; 
 
 // --- Types & Interfaces ---
@@ -180,7 +180,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
 
     try {
       if (isRegistering) {
-        // D1 Database is cleaner, no need to swap keys like Google Sheets
+        // Direct D1 Database call
         const payload = { 
             name: formData.name,
             email: email, 
@@ -819,7 +819,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                     <label className="block text-sm font-medium mb-1">Penerangan</label>
                                     <textarea className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none h-24" placeholder="Maklumat lanjut mengenai kelas..." value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})}/>
                                 </div>
-                                <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Simpan ke Google Sheet</button>
+                                <button className="md:col-span-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition">Simpan Kelas</button>
                             </form>
                         </div>
                     )}
@@ -1018,7 +1018,7 @@ const App = () => {
   }
 
   const handlePay = async (enrollId: string) => {
-      // Mock Payment for Google Sheet version: Confirm dialog acting as payment gateway
+      // Mock Payment: Confirm dialog acting as payment gateway
       if(confirm("Sahkan pembayaran manual (Demo)?\nKlik OK untuk menandakan sebagai 'Paid'.")) {
           setLoading(true);
           try {

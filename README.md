@@ -1,20 +1,49 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CelikKalam - Aplikasi Kelas Mengaji
 
-# Run and deploy your AI Studio app
+Aplikasi ini menggunakan **React (Vite)** untuk frontend dan **Cloudflare Pages Functions + D1 Database** untuk backend.
 
-This contains everything you need to run your app locally.
+## 🚀 Cara Deploy (Langkah Demi Langkah)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1QNkdPpNyUCfakUt_mVAy5ZBcJ9VBFsA7
+### 1. Setup Database (Buat kali pertama)
+Pastikan anda telah login ke Cloudflare (`npx wrangler login`). Kemudian, cipta struktur jadual:
 
-## Run Locally
+```bash
+npx wrangler d1 execute celikkalam-db --file=./schema.sql --remote
+```
 
-**Prerequisites:**  Node.js
+### 2. Build Projek
+Setiap kali anda ubah kod frontend (fail `.tsx`), anda wajib jalankan ini:
 
+```bash
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 3. Deploy ke Internet
+Hantar folder `dist` ke Cloudflare:
+
+```bash
+npx wrangler pages deploy dist
+```
+
+---
+
+## 🛠 Cara Cipta Admin
+Selepas deploy, daftar akaun biasa di website anda. Kemudian, tukar role mereka kepada 'admin' menggunakan terminal:
+
+1. Dapatkan ID pengguna (boleh tengok di D1 console dashboard atau agak-agak jika baru daftar seorang):
+```bash
+npx wrangler d1 execute celikkalam-db --command="SELECT * FROM users" --remote
+```
+
+2. Update role kepada admin:
+```bash
+npx wrangler d1 execute celikkalam-db --command="UPDATE users SET role='admin' WHERE email='emel_anda@gmail.com'" --remote
+```
+
+## 💻 Local Development
+Untuk test di komputer sendiri (termasuk database):
+
+```bash
+npm run build
+npx wrangler pages dev dist --d1 DB=celikkalam-db
+```

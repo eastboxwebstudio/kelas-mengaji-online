@@ -6,14 +6,13 @@ export const onRequest = async (context: any) => {
   const { request, env } = context;
   const url = new URL(request.url);
   
-  // CORS Headers untuk membenarkan akses dari frontend
+  // CORS Headers
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  // Handle Preflight Request (untuk browser check)
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,14 +20,12 @@ export const onRequest = async (context: any) => {
   let action = url.searchParams.get("action");
   let payload: any = {};
 
-  // Parse body jika POST request
   if (request.method === "POST") {
     try {
       const text = await request.text();
       if (text && text.trim().length > 0) {
           payload = JSON.parse(text);
       }
-      // Action boleh berada dalam URL query atau JSON body
       action = payload.action || action;
     } catch (e) {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), { 
@@ -37,7 +34,6 @@ export const onRequest = async (context: any) => {
       });
     }
   } else {
-    // Ambil query params untuk GET request
     url.searchParams.forEach((value, key) => {
       payload[key] = value;
     });
@@ -60,22 +56,27 @@ export const onRequest = async (context: any) => {
 
     switch (action) {
       case "getData":
-        // Dapatkan semua data yang diperlukan untuk paparan awal
-        const classes = await db.prepare("SELECT * FROM classes WHERE isActive = 1 ORDER BY created_at DESC").all();
-        const enrollments = await db.prepare("SELECT * FROM enrollments ORDER BY created_at DESC").all();
-        // Hati-hati dengan data pengguna, hanya ambil field yang perlu
-        const users = await db.prepare("SELECT id, name, email, role, phone FROM users").all();
-        
-        result = {
-          classes: classes.results || [],
-          enrollments: enrollments.results || [],
-          users: users.results || []
-        };
+        try {
+            const classes = await db.prepare("SELECT * FROM classes WHERE isActive = 1 ORDER BY created_at DESC").all();
+            const enrollments = await db.prepare("SELECT * FROM enrollments ORDER BY created_at DESC").all();
+            const users = await db.prepare("SELECT id, name, email, role, phone FROM users").all();
+            
+            result = {
+              classes: classes.results || [],
+              enrollments: enrollments.results || [],
+              users: users.results || []
+            };
+        } catch (dbError: any) {
+            // Check specifically for missing table error to give a helpful hint
+            if (dbError.message && dbError.message.includes("no such table")) {
+                throw new Error("Database belum siap setup. Sila jalankan: npx wrangler d1 execute celikkalam-db --file=./schema.sql --remote");
+            }
+            throw dbError;
+        }
         break;
 
       case "login":
         const { email, password } = payload;
-        // Nota: Dalam production sebenar, password perlu di-hash!
         const user = await db.prepare("SELECT * FROM users WHERE email = ? AND password = ?").bind(email, password).first();
         
         if (user) {
@@ -97,7 +98,6 @@ export const onRequest = async (context: any) => {
            });
         }
 
-        // Default role is student unless specified
         const userRole = role || 'student';
 
         await db.prepare(
@@ -123,7 +123,6 @@ export const onRequest = async (context: any) => {
         const enrollId = crypto.randomUUID();
         const { userId, classId: enrollClassId } = payload;
         
-        // Check if already enrolled
         const existingEnroll = await db.prepare("SELECT id FROM enrollments WHERE userId = ? AND classId = ?").bind(userId, enrollClassId).first();
         if (existingEnroll) {
              return new Response(JSON.stringify({ error: "Anda sudah mendaftar kelas ini." }), { 
