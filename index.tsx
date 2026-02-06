@@ -8,13 +8,11 @@ import {
   XCircle, 
   Loader2, 
   Inbox, 
-  Settings, 
   Plus, 
   CreditCard, 
   Video, 
   GraduationCap, 
   ArrowRight,
-  Sheet,
   Database,
   AlertCircle,
   RefreshCw,
@@ -30,12 +28,43 @@ import {
   ClipboardList
 } from 'lucide-react';
 
-// --- CONFIGURATION ---
+// --- MOCK DATA & LOCAL STORAGE HELPER ---
 
-// Menggunakan Cloudflare Functions (API tempatan) dengan D1 Database
-const API_BASE_URL = "/api"; 
+const STORAGE_KEYS = {
+  USERS: 'celikkalam_users',
+  CLASSES: 'celikkalam_classes',
+  ENROLLMENTS: 'celikkalam_enrollments',
+  CURRENT_USER: 'celikkalam_current_user'
+};
 
-// --- Types & Interfaces ---
+const INITIAL_CLASSES = [
+  {
+    id: 'c1',
+    title: 'Kelas Asas Iqra (Dewasa)',
+    description: 'Sesuai untuk mereka yang baru ingin mengenali huruf hijaiyah dan asas bacaan. Belajar dari kosong dengan teknik mudah faham.',
+    schedule: 'Isnin & Rabu, 9:00 PM',
+    price: 50,
+    googleMeetLink: 'https://meet.google.com/abc-defg-hij',
+    isActive: true,
+    type: 'monthly',
+    instructorId: 'ustaz1',
+    instructorName: 'Ustaz Ahmad'
+  },
+  {
+    id: 'c2',
+    title: 'Talaqqi Al-Quran Bersanad',
+    description: 'Kelas lanjutan membaiki bacaan Al-Fatihah dan surah lazim. Fokus pada makhraj huruf dan tajwid yang tepat.',
+    schedule: 'Sabtu, 10:00 AM',
+    price: 80,
+    googleMeetLink: 'https://meet.google.com/xyz-wdwd-sds',
+    isActive: true,
+    type: 'monthly',
+    instructorId: 'ustaz1',
+    instructorName: 'Ustaz Ahmad'
+  }
+];
+
+// --- Types ---
 
 type UserRole = 'guest' | 'student' | 'admin' | 'ustaz';
 
@@ -69,47 +98,37 @@ interface Enrollment {
   transactionId?: string; 
 }
 
-// --- API Helper ---
+// --- FAKE BACKEND (LOCAL STORAGE LOGIC) ---
 
-const apiCall = async (action: string, payload: any = {}, method = 'GET') => {
-  // Cloudflare D1 Backend handling
-  let url = API_BASE_URL;
-  let options: RequestInit = { method };
-
-  if (method === 'GET') {
-    const params = new URLSearchParams({ action, ...payload });
-    url = `${API_BASE_URL}?${params.toString()}`;
-  } else {
-    // Include action in body for POST
-    options.body = JSON.stringify({ action, ...payload });
-    options.headers = { 'Content-Type': 'application/json' };
-  }
-
-  try {
-    const response = await fetch(url, options);
-    
-    // Check if response is valid JSON
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Non-JSON Response:", text);
-        // Better error message
-        if (response.status === 404) {
-            throw new Error("API tidak ditemui (404). Sila pastikan Cloudflare Functions berjalan.");
-        }
-        throw new Error(`Ralat Pelayan (${response.status}): Respons tidak sah.`);
+const db = {
+  get: (key: string, defaultVal: any) => {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : defaultVal;
+  },
+  set: (key: string, val: any) => {
+    localStorage.setItem(key, JSON.stringify(val));
+  },
+  // Initialize mock data if empty
+  init: () => {
+    if (!localStorage.getItem(STORAGE_KEYS.CLASSES)) {
+      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(INITIAL_CLASSES));
     }
-
-    const json = await response.json();
-
-    if (!response.ok) throw new Error(json.error || "Ralat pelayan (" + response.status + ")");
-    if (json.error) throw new Error(json.error);
-    
-    return json;
-  } catch (err: any) {
-     throw new Error(err.message || "Ralat rangkaian.");
+    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+      // Create a default admin and ustaz for testing
+      const defaultUsers = [
+        { id: 'admin1', name: 'Admin', email: 'admin@test.com', password: 'admin', role: 'admin', phone: '0123456789' },
+        { id: 'ustaz1', name: 'Ustaz Ahmad', email: 'ustaz@test.com', password: 'ustaz', role: 'ustaz', phone: '01122334455' }
+      ];
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.ENROLLMENTS)) {
+      localStorage.setItem(STORAGE_KEYS.ENROLLMENTS, JSON.stringify([]));
+    }
   }
 };
+
+// Initialize DB on load
+db.init();
 
 // --- Components ---
 
@@ -156,63 +175,51 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
 
   if (!isOpen) return null;
 
-  const sanitizeUser = (rawUser: any): Profile => {
-      let roleStr = 'student';
-      if (rawUser.role) {
-          const r = String(rawUser.role).toLowerCase().trim();
-          if (!/^\d+$/.test(r)) {
-             roleStr = r;
-          }
-      }
-      return {
-          ...rawUser,
-          role: roleStr as UserRole
-      };
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    const email = formData.email.trim();
-    const password = formData.password.trim();
+    // Simulate Network Delay
+    setTimeout(() => {
+        const users = db.get(STORAGE_KEYS.USERS, []);
+        const email = formData.email.trim();
+        const password = formData.password.trim();
 
-    try {
-      if (isRegistering) {
-        // Direct D1 Database call
-        const payload = { 
-            name: formData.name,
-            email: email, 
-            password: password,
-            phone: formData.phone,
-            role: formData.role, 
-        };
+        if (isRegistering) {
+            const exists = users.find((u: any) => u.email === email);
+            if (exists) {
+                setError("Emel ini sudah didaftarkan.");
+                setIsLoading(false);
+                return;
+            }
 
-        const res = await apiCall('register', payload, 'POST');
-        if (res.user) {
-           const user = sanitizeUser(res.user);
-           localStorage.setItem('currentUser', JSON.stringify(user));
-           onLogin(user);
-           onClose();
-        }
-      } else {
-        const res = await apiCall('login', { email, password }, 'POST');
-        if (res.user) {
-            const user = sanitizeUser(res.user);
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            onLogin(user);
+            const newUser = {
+                id: crypto.randomUUID(),
+                ...formData,
+                email,
+                password // In real app, never store plain text
+            };
+            
+            users.push(newUser);
+            db.set(STORAGE_KEYS.USERS, users);
+            
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(newUser));
+            onLogin(newUser);
             onClose();
+
         } else {
-            setError(res.error || "Emel atau kata laluan salah.");
+            const user = users.find((u: any) => u.email === email && u.password === password);
+            if (user) {
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+                onLogin(user);
+                onClose();
+            } else {
+                setError("Emel atau kata laluan salah.");
+            }
         }
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Ralat sambungan. Sila cuba lagi.");
-    } finally {
-      setIsLoading(false);
-    }
+        setIsLoading(false);
+    }, 800);
   };
 
   return (
@@ -925,171 +932,137 @@ const App = () => {
   const [user, setUser] = useState<Profile | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [classes, setClasses] = useState<ClassSession[]>([]);
-  const [users, setUsers] = useState<Profile[]>([]); // New State for Users list
+  const [users, setUsers] = useState<Profile[]>([]); 
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState('');
 
   // Initial Load
   useEffect(() => {
-    // Check local storage for simple persist
-    const stored = localStorage.getItem('currentUser');
-    if (stored) {
-       try {
-        const u = JSON.parse(stored);
-        if (u) {
-            // Normalize role on load safely
-            const roleStr = u.role ? String(u.role).toLowerCase().trim() : 'student';
-            // Simple check if role looks corrupted (digits)
-            if (/^\d+$/.test(roleStr)) {
-                // corrupted data found in local storage
-                localStorage.removeItem('currentUser');
-                return;
-            }
-            u.role = roleStr;
-            setUser(u);
-        }
-       } catch(e) { 
-           console.error("Storage corrupt", e);
-           localStorage.removeItem('currentUser');
-       }
+    // 1. Get Logged In User
+    const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (storedUser) {
+        setUser(JSON.parse(storedUser));
     }
+
+    // 2. Load Data from LocalStorage
     fetchData();
   }, []);
-  
-  // Refresh data when user logs in to ensure dashboard is populated
-  useEffect(() => {
-      if(user) fetchData();
-  }, [user]);
 
   const fetchData = async () => {
-    // If running in development without a backend, this might fail, handle gracefully
     setLoading(true);
-    setFetchError('');
-    try {
-        const data = await apiCall('getData');
-        if (data.classes) setClasses(data.classes);
-        if (data.enrollments) setEnrollments(data.enrollments);
-        
-        // Handle Users fetch and sanitization if backend returns it
-        if (data.users && Array.isArray(data.users)) {
-            const cleanUsers = data.users.map((u: any) => {
-                 let roleStr = 'student';
-                 // Handle the known swap bug if raw data is persistent
-                 if (u.role) {
-                     const r = String(u.role).toLowerCase().trim();
-                     if (!/^\d+$/.test(r)) roleStr = r;
-                 }
-                 return { ...u, role: roleStr };
-            });
-            setUsers(cleanUsers);
-        }
-    } catch (err: any) {
-        console.error(err);
-        setFetchError(err.message || "Gagal menghubungi database.");
-    } finally {
+    // Simulate slight delay to feel like an "app"
+    setTimeout(() => {
+        setClasses(db.get(STORAGE_KEYS.CLASSES, []));
+        setEnrollments(db.get(STORAGE_KEYS.ENROLLMENTS, []));
+        setUsers(db.get(STORAGE_KEYS.USERS, []));
         setLoading(false);
-    }
+    }, 500);
   };
 
-  const handleCreateClass = async (data: any) => {
+  const handleCreateClass = (data: any) => {
       setLoading(true);
-      try {
-          await apiCall('createClass', data, 'POST');
+      setTimeout(() => {
+          const newClass = {
+              id: crypto.randomUUID(),
+              ...data,
+              isActive: true,
+              type: 'monthly' // default
+          };
+          const updatedClasses = [newClass, ...classes];
+          db.set(STORAGE_KEYS.CLASSES, updatedClasses);
+          setClasses(updatedClasses);
+          setLoading(false);
           alert("Kelas berjaya ditambah!");
-          fetchData(); // Refresh
-      } catch (err: any) { alert(err.message); }
-      finally { setLoading(false); }
+      }, 500);
   }
 
-  const handleEnroll = async (classId: string) => {
+  const handleEnroll = (classId: string) => {
       if(!user) return setIsAuthOpen(true);
-      if (enrollments.some(e => e.userId === user.id && e.classId === classId)) {
+      
+      const currentEnrollments = db.get(STORAGE_KEYS.ENROLLMENTS, []);
+      const exists = currentEnrollments.find((e: any) => e.userId === user.id && e.classId === classId);
+      
+      if (exists) {
           alert("Anda sudah mendaftar untuk kelas ini.");
           return;
       }
+
       setLoading(true);
-      try {
-          await apiCall('enroll', { userId: user.id, classId }, 'POST');
+      setTimeout(() => {
+          const newEnroll = {
+              id: crypto.randomUUID(),
+              userId: user.id,
+              classId: classId,
+              status: 'Unpaid'
+          };
+          const updated = [newEnroll, ...currentEnrollments];
+          db.set(STORAGE_KEYS.ENROLLMENTS, updated);
+          setEnrollments(updated);
+          setLoading(false);
           alert("Berjaya daftar! Sila buat pembayaran di tab Kelas Saya.");
-          fetchData();
-      } catch(err: any) { alert(err.message); }
-      finally { setLoading(false); }
+      }, 500);
   }
 
-  const handlePay = async (enrollId: string) => {
-      // Mock Payment: Confirm dialog acting as payment gateway
+  const handlePay = (enrollId: string) => {
       if(confirm("Sahkan pembayaran manual (Demo)?\nKlik OK untuk menandakan sebagai 'Paid'.")) {
           setLoading(true);
-          try {
-             await apiCall('pay', { enrollId }, 'POST');
+          setTimeout(() => {
+             const updated = enrollments.map(e => e.id === enrollId ? {...e, status: 'Paid'} : e);
+             db.set(STORAGE_KEYS.ENROLLMENTS, updated);
+             setEnrollments(updated as Enrollment[]);
+             setLoading(false);
              alert("Pembayaran berjaya direkodkan!");
-             fetchData();
-          } catch(err: any) { alert(err.message); }
-          finally { setLoading(false); }
+          }, 500);
       }
   }
 
-  const handleAdminVerifyPayment = async (enrollId: string) => {
+  const handleAdminVerifyPayment = (enrollId: string) => {
       if(confirm("Adakah anda pasti mahu mengesahkan pembayaran ini secara manual?")) {
           setLoading(true);
-          try {
-             await apiCall('pay', { enrollId }, 'POST');
+          setTimeout(() => {
+             const updated = enrollments.map(e => e.id === enrollId ? {...e, status: 'Paid'} : e);
+             db.set(STORAGE_KEYS.ENROLLMENTS, updated);
+             setEnrollments(updated as Enrollment[]);
+             setLoading(false);
              alert("Status berjaya dikemaskini ke 'Paid'.");
-             fetchData();
-          } catch(err: any) { alert(err.message); }
-          finally { setLoading(false); }
+          }, 500);
       }
   }
   
+  const handleLogout = () => {
+      setUser(null);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      window.location.href = '/';
+  }
+
   const renderDashboard = () => {
       if (!user) return <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />;
       
-      // Safe cast
       const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
       
       if (role === 'admin') return <AdminDashboard classes={classes} users={users} enrollments={enrollments} onCreateClass={handleCreateClass} onVerifyPayment={handleAdminVerifyPayment} />;
       if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} users={users} />;
       if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
       
-      // Fallback if role is weird or corrupted data leaked through
-      return (
-          <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-8 rounded-xl inline-block max-w-lg">
-                <AlertCircle size={48} className="mx-auto mb-4 text-yellow-600"/>
-                <h3 className="text-xl font-bold mb-2">Akaun Ditemui, Tetapi Peranan Tidak Sah</h3>
-                <p className="mb-4">Peranan anda direkodkan sebagai: <strong>'{user.role}'</strong>.</p>
-                <p className="text-sm">Ini mungkin disebabkan oleh kerosakan data lama. Sila daftar semula atau hubungi admin.</p>
-                <button onClick={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} className="mt-6 bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-yellow-700">Log Keluar & Daftar Semula</button>
-            </div>
-          </div>
-      );
+      return <div>Error Role</div>;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
-      <Navbar user={user} onOpenAuth={() => setIsAuthOpen(true)} onLogout={() => { setUser(null); localStorage.removeItem('currentUser'); window.location.href='/'; }} />
+      <Navbar user={user} onOpenAuth={() => setIsAuthOpen(true)} onLogout={handleLogout} />
       
       {loading && <div className="fixed top-20 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg flex gap-3 items-center z-[100] animate-bounce"><Loader2 className="animate-spin" size={20}/> Memproses data...</div>}
-      
-      {fetchError && (
-          <div className="max-w-7xl mx-auto mt-4 px-4">
-            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center justify-between">
-                <span className="flex items-center gap-2"><AlertCircle size={20}/> {fetchError}</span>
-                <button onClick={fetchData} className="bg-white border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-sm flex items-center gap-1"><RefreshCw size={14}/> Cuba Lagi</button>
-            </div>
-          </div>
-      )}
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLogin={setUser} />
 
       {renderDashboard()}
     
-      {/* Footer / Debug Info */}
+      {/* Footer */}
       <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
          <div className="max-w-7xl mx-auto px-4">
             <p className="font-semibold text-emerald-900 mb-2">CelikKalam Digital</p>
-            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi Cloudflare D1 Database.</p>
+            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara.</p>
+            <p className="text-xs text-gray-400 mt-2">Mode: Client-Side Demo (Tiada Backend)</p>
          </div>
       </div>
     </div>
