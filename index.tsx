@@ -32,8 +32,8 @@ import {
 
 // --- CONFIGURATION ---
 
-// URL Web App Google Apps Script anda
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnRE4NaXFw4uWD8_6EpL5o743Btqgce8UyWzoEEQGOgxX_JsiSaTSgEnyfdyqLGkXeRQ/exec"; 
+// Sekarang kita menggunakan Cloudflare Functions (API tempatan)
+const API_BASE_URL = "/api"; 
 
 // --- Types & Interfaces ---
 
@@ -72,33 +72,38 @@ interface Enrollment {
 // --- API Helper ---
 
 const apiCall = async (action: string, payload: any = {}, method = 'GET') => {
-  // Google Apps Script Web App handling
-  let url = GOOGLE_SCRIPT_URL;
+  // Cloudflare D1 Backend handling
+  let url = API_BASE_URL;
   let options: RequestInit = { method };
 
   if (method === 'GET') {
     const params = new URLSearchParams({ action, ...payload });
-    url = `${GOOGLE_SCRIPT_URL}?${params.toString()}`;
+    url = `${API_BASE_URL}?${params.toString()}`;
   } else {
+    // Include action in body for POST
     options.body = JSON.stringify({ action, ...payload });
-    // Use text/plain to avoid CORS preflight issues in GAS
-    options.headers = { 'Content-Type': 'text/plain' };
+    options.headers = { 'Content-Type': 'application/json' };
   }
 
   try {
     const response = await fetch(url, options);
-    const text = await response.text();
     
-    let json;
-    try {
-        json = JSON.parse(text);
-    } catch (e) {
-        console.error("Server returned non-JSON:", text);
-        throw new Error("Ralat pelayan: Data tidak sah diterima dari Google Sheet. Sila pastikan deployment GAS betul.");
+    // Check if response is valid JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON Response:", text);
+        // Better error message
+        if (response.status === 404) {
+            throw new Error("API tidak ditemui (404). Sila pastikan Cloudflare Functions berjalan.");
+        }
+        throw new Error(`Ralat Pelayan (${response.status}): Respons tidak sah.`);
     }
 
-    if (!response.ok) throw new Error("Gagal menghubungi Google Sheet: " + response.statusText);
-    if (json.status === 'error' || json.error) throw new Error(json.message || json.error);
+    const json = await response.json();
+
+    if (!response.ok) throw new Error(json.error || "Ralat pelayan (" + response.status + ")");
+    if (json.error) throw new Error(json.error);
     
     return json;
   } catch (err: any) {
@@ -152,11 +157,9 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
   if (!isOpen) return null;
 
   const sanitizeUser = (rawUser: any): Profile => {
-      // Safely handle role casting and prevent crash if role is numeric (corrupted data)
       let roleStr = 'student';
       if (rawUser.role) {
           const r = String(rawUser.role).toLowerCase().trim();
-          // Validation: Role must be a valid string, not a phone number (digits)
           if (!/^\d+$/.test(r)) {
              roleStr = r;
           }
@@ -177,16 +180,13 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
 
     try {
       if (isRegistering) {
-        // WORKAROUND: The Google Apps Script backend has a bug where it swaps the 'phone' and 'role' columns when saving.
-        // To fix this from the client-side without touching the backend, we deliberately swap the keys in the payload.
-        // We send the 'role' value in the 'phone' key, and 'phone' value in the 'role' key.
+        // D1 Database is cleaner, no need to swap keys like Google Sheets
         const payload = { 
             name: formData.name,
             email: email, 
             password: password,
-            // Swapping keys to handle backend bug where phone/role columns are inverted
-            phone: formData.role,
-            role: formData.phone, 
+            phone: formData.phone,
+            role: formData.role, 
         };
 
         const res = await apiCall('register', payload, 'POST');
@@ -204,7 +204,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
             onLogin(user);
             onClose();
         } else {
-            setError("Emel atau kata laluan salah.");
+            setError(res.error || "Emel atau kata laluan salah.");
         }
       }
     } catch (err: any) {
@@ -963,7 +963,7 @@ const App = () => {
   }, [user]);
 
   const fetchData = async () => {
-    if (!GOOGLE_SCRIPT_URL) return;
+    // If running in development without a backend, this might fail, handle gracefully
     setLoading(true);
     setFetchError('');
     try {
@@ -1089,7 +1089,7 @@ const App = () => {
       <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
          <div className="max-w-7xl mx-auto px-4">
             <p className="font-semibold text-emerald-900 mb-2">CelikKalam Digital</p>
-            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi Google Sheets Database.</p>
+            <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara. Dibangunkan dengan teknologi Cloudflare D1 Database.</p>
          </div>
       </div>
     </div>
