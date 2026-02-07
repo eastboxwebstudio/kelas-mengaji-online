@@ -3,25 +3,21 @@
 Aplikasi ini kini berjalan sepenuhnya di browser menggunakan **LocalStorage**. 
 Tiada backend, tiada database, tiada server error.
 
-## 🚀 Cara Deploy (Penting!)
+## 🚀 Cara Deploy ke Cloudflare Pages
 
-Kerana kita sudah buang backend, sila guna arahan ini dengan tepat:
+Projek ini direka untuk deployment automatik melalui GitHub.
 
-1. **Install:**
-   ```bash
-   npm install
-   ```
+1.  **Sambung ke GitHub:**
+    *   Di Cloudflare Dashboard, cipta projek **Pages** baru.
+    *   Sambungkan ke repo GitHub ini.
 
-2. **Build Project:**
-   ```bash
-   npm run build
-   ```
+2.  **Konfigurasi Build:**
+    *   **Framework Preset:** `Vite`
+    *   **Build Command:** `npm run build`
+    *   **Build Output Directory:** `dist`
 
-3. **Deploy ke Cloudflare Pages:**
-   ```bash
-   npx wrangler pages deploy dist
-   ```
-   *(Pilih "Create a new project" jika ditanya, dan namakan projek ini `celikkalam`)*
+3.  **Deploy:**
+    *   Cloudflare akan deploy secara automatik setiap kali anda `git push` ke branch `main`.
 
 ## 💻 Cara Run Local
 ```bash
