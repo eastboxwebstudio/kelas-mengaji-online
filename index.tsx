@@ -1,71 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { 
-  BookOpen, 
-  User, 
-  LogOut, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
-  Inbox, 
-  Plus, 
-  CreditCard, 
-  Video, 
-  GraduationCap, 
-  ArrowRight,
-  Database,
-  AlertCircle,
-  RefreshCw,
-  Users,
-  Calendar,
-  Clock,
-  Eye,
-  EyeOff,
-  Wand2,
-  Check,
-  ChevronDown,
-  Phone,
-  ClipboardList
+  BookOpen, User, LogOut, CheckCircle, XCircle, Loader2, Inbox, Plus, CreditCard, Video, GraduationCap, ArrowRight,
+  Database, AlertCircle, RefreshCw, Users, Calendar, Clock, Eye, EyeOff, Wand2, Check, ChevronDown, Phone, ClipboardList
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-// --- MOCK DATA & LOCAL STORAGE HELPER ---
-
-const STORAGE_KEYS = {
-  USERS: 'celikkalam_users',
-  CLASSES: 'celikkalam_classes',
-  ENROLLMENTS: 'celikkalam_enrollments',
-  CURRENT_USER: 'celikkalam_current_user'
-};
-
-const INITIAL_CLASSES = [
-  {
-    id: 'c1',
-    title: 'Kelas Asas Iqra (Dewasa)',
-    description: 'Sesuai untuk mereka yang baru ingin mengenali huruf hijaiyah dan asas bacaan. Belajar dari kosong dengan teknik mudah faham.',
-    schedule: 'Isnin & Rabu, 9:00 PM',
-    price: 50,
-    googleMeetLink: 'https://meet.google.com/abc-defg-hij',
-    isActive: true,
-    type: 'monthly',
-    instructorId: 'ustaz1',
-    instructorName: 'Ustaz Ahmad'
-  },
-  {
-    id: 'c2',
-    title: 'Talaqqi Al-Quran Bersanad',
-    description: 'Kelas lanjutan membaiki bacaan Al-Fatihah dan surah lazim. Fokus pada makhraj huruf dan tajwid yang tepat.',
-    schedule: 'Sabtu, 10:00 AM',
-    price: 80,
-    googleMeetLink: 'https://meet.google.com/xyz-wdwd-sds',
-    isActive: true,
-    type: 'monthly',
-    instructorId: 'ustaz1',
-    instructorName: 'Ustaz Ahmad'
-  }
-];
+// --- SUPABASE CLIENT SETUP ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- Types ---
-
 type UserRole = 'guest' | 'student' | 'admin' | 'ustaz';
 
 interface Profile {
@@ -74,61 +20,30 @@ interface Profile {
   email: string;
   role: UserRole;
   phone?: string;
-  password?: string;
 }
 
 interface ClassSession {
   id: string;
   title: string;
-  description: string;
-  schedule: string; 
+  description?: string;
+  schedule?: string;
   price: number;
-  googleMeetLink: string; 
-  isActive: boolean; 
+  google_meet_link?: string;
+  is_active: boolean;
   type: 'single' | 'monthly';
-  instructorId: string; 
-  instructorName: string; 
+  instructor_id?: string;
+  instructor_name?: string;
 }
 
 interface Enrollment {
   id: string;
-  userId: string; 
-  classId: string; 
+  user_id: string;
+  class_id: string;
   status: 'Unpaid' | 'Paid';
-  transactionId?: string; 
+  classes?: ClassSession; // For joining data
+  profiles?: Profile; // For joining data
 }
 
-// --- FAKE BACKEND (LOCAL STORAGE LOGIC) ---
-
-const db = {
-  get: (key: string, defaultVal: any) => {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultVal;
-  },
-  set: (key: string, val: any) => {
-    localStorage.setItem(key, JSON.stringify(val));
-  },
-  // Initialize mock data if empty
-  init: () => {
-    if (!localStorage.getItem(STORAGE_KEYS.CLASSES)) {
-      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(INITIAL_CLASSES));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-      // Create a default admin and ustaz for testing
-      const defaultUsers = [
-        { id: 'admin1', name: 'Admin', email: 'admin@test.com', password: 'admin', role: 'admin', phone: '0123456789' },
-        { id: 'ustaz1', name: 'Ustaz Ahmad', email: 'ustaz@test.com', password: 'ustaz', role: 'ustaz', phone: '01122334455' }
-      ];
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ENROLLMENTS)) {
-      localStorage.setItem(STORAGE_KEYS.ENROLLMENTS, JSON.stringify([]));
-    }
-  }
-};
-
-// Initialize DB on load
-db.init();
 
 // --- Components ---
 
@@ -163,14 +78,14 @@ const Navbar = ({ user, onOpenAuth, onLogout }: { user: Profile | null, onOpenAu
   </nav>
 );
 
-const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () => void, onLogin: (u: Profile) => void }) => {
+const AuthModal = ({ isOpen, onClose, onLoginSuccess }: { isOpen: boolean, onClose: () => void, onLoginSuccess: () => void }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  const [formData, setFormData] = useState<{name: string, email: string, password: string, phone: string, role: UserRole}>({ 
-      name: '', email: '', password: '', phone: '', role: 'student' 
+  const [formData, setFormData] = useState({ 
+      name: '', email: '', password: '', phone: '', role: 'student' as UserRole
   });
 
   if (!isOpen) return null;
@@ -180,46 +95,39 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
     setError('');
     setIsLoading(true);
 
-    // Simulate Network Delay
-    setTimeout(() => {
-        const users = db.get(STORAGE_KEYS.USERS, []);
-        const email = formData.email.trim();
-        const password = formData.password.trim();
-
-        if (isRegistering) {
-            const exists = users.find((u: any) => u.email === email);
-            if (exists) {
-                setError("Emel ini sudah didaftarkan.");
-                setIsLoading(false);
-                return;
+    try {
+      if (isRegistering) {
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              name: formData.name,
+              phone: formData.phone,
+              role: formData.role
             }
+          }
+        });
 
-            const newUser = {
-                id: crypto.randomUUID(),
-                ...formData,
-                email,
-                password // In real app, never store plain text
-            };
-            
-            users.push(newUser);
-            db.set(STORAGE_KEYS.USERS, users);
-            
-            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(newUser));
-            onLogin(newUser);
-            onClose();
+        if (error) throw error;
+        alert('Pendaftaran berjaya! Sila semak emel anda untuk pengesahan.');
+        onClose();
 
-        } else {
-            const user = users.find((u: any) => u.email === email && u.password === password);
-            if (user) {
-                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-                onLogin(user);
-                onClose();
-            } else {
-                setError("Emel atau kata laluan salah.");
-            }
-        }
-        setIsLoading(false);
-    }, 800);
+      } else { // Logging in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+        
+        if (error) throw error;
+        onLoginSuccess();
+        onClose();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Sesuatu yang tidak kena telah berlaku.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -240,7 +148,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
                   <input type="text" placeholder="Nama Penuh" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
                   <input type="tel" placeholder="No. Telefon" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
                   
-                  {/* Role Selection */}
                   <div className="flex gap-4 p-2 bg-gray-50 rounded-lg border">
                       <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer">
                           <input type="radio" name="role" value="student" checked={formData.role === 'student'} onChange={() => setFormData({...formData, role: 'student'})} className="text-emerald-600 focus:ring-emerald-500" />
@@ -290,6 +197,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () 
   );
 };
 
+// ... (LandingPage component remains the same)
 const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenAuth: () => void }) => {
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -391,7 +299,7 @@ const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenA
                     <div className="space-y-3 mb-6">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                              <User size={16} className="text-emerald-500"/>
-                             <span className="font-medium">{cls.instructorName || "Pengajar: Admin"}</span>
+                             <span className="font-medium">{cls.instructor_name || "Pengajar: Admin"}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Calendar size={16} className="text-emerald-500"/>
@@ -464,118 +372,223 @@ const LandingPage = ({ classes, onOpenAuth }: { classes: ClassSession[], onOpenA
   );
 };
 
-const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay }: any) => {
-    const myEnrolls = enrollments.filter((e: Enrollment) => e.userId === user.id);
-    const myClassIds = myEnrolls.map((e: Enrollment) => e.classId);
+const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading }: { 
+    isOpen: boolean, 
+    onClose: () => void, 
+    enrollment: Enrollment | null, 
+    onConfirmPayment: (id: string) => Promise<void>, 
+    isLoading: boolean 
+}) => {
+    if (!isOpen || !enrollment) return null;
+    
+    const cls = enrollment.classes;
 
-    // Get my active classes to show schedule
-    const myActiveClasses = classes.filter((c: ClassSession) => myClassIds.includes(c.id));
+    const handleConfirm = async () => {
+        try {
+            await onConfirmPayment(enrollment.id);
+            onClose(); // Close modal only on successful payment
+        } catch (error) {
+            console.error("Payment failed:", error);
+            // Error is already alerted by the handler, no need to alert again.
+            // Modal remains open for user to retry.
+        }
+    }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold mb-8">Portal Pelajar: <span className="text-emerald-600">{user.name}</span></h1>
-            
-            {/* JADUAL SECTION */}
-            <div className="mb-12">
-                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calendar size={20} className="text-emerald-600"/> Jadual Kelas Saya</h2>
-                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    {myActiveClasses.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400">Tiada kelas berdaftar. Jadual kosong.</div>
-                    ) : (
-                        <div className="grid grid-cols-1 divide-y">
-                            {myActiveClasses.map((cls: ClassSession) => (
-                                <div key={cls.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-gray-50 transition">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-emerald-100 p-3 rounded-full text-emerald-700">
-                                            <Clock size={20}/>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative overflow-hidden animate-fade-in-up">
+                <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><CreditCard size={22} className="text-emerald-600"/> Pengesahan Pembayaran</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800"><XCircle/></button>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div>
+                        <h3 className="font-semibold text-gray-500 text-sm uppercase tracking-wider">Butiran Kelas</h3>
+                        <div className="mt-2 bg-slate-50 p-4 rounded-lg border">
+                            <p className="font-bold text-lg text-gray-900">{cls?.title}</p>
+                            <p className="text-sm text-gray-600">Pengajar: {cls?.instructor_name}</p>
+                            <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                                <span className="text-gray-500 font-medium">Jumlah Bayaran:</span>
+                                <span className="text-2xl font-bold text-emerald-600">RM {cls?.price}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="font-semibold text-gray-500 text-sm uppercase tracking-wider">Maklumat Pembayaran (Simulasi)</h3>
+                        <div className="mt-2 space-y-4">
+                            <input type="text" placeholder="Nama Penuh Pada Kad" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" defaultValue={enrollment.profiles?.name} />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <input type="text" placeholder="XXXX XXXX XXXX XXXX" className="sm:col-span-3 w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
+                                <input type="text" placeholder="MM/YY" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
+                                <input type="text" placeholder="CVC" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button 
+                        onClick={handleConfirm} 
+                        disabled={isLoading} 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-lg flex justify-center items-center gap-2 transition-all shadow-lg hover:shadow-xl shadow-emerald-500/20 disabled:bg-emerald-400 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="animate-spin" /> Memproses...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle size={18}/> Sahkan Pembayaran
+                            </>
+                        )}
+                    </button>
+                    <p className="text-xs text-center text-gray-400">Ini adalah simulasi. Tiada caj sebenar akan dikenakan.</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay, loading }: {
+    user: Profile;
+    classes: ClassSession[];
+    enrollments: Enrollment[];
+    onEnroll: (classId: string) => void;
+    onPay: (enrollId: string) => Promise<void>;
+    loading: boolean;
+}) => {
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
+
+    const handleOpenPaymentModal = (enrollment: Enrollment) => {
+        setSelectedEnrollment(enrollment);
+        setIsPaymentModalOpen(true);
+    };
+
+    const myEnrolls = enrollments.filter((e: Enrollment) => e.user_id === user.id);
+    const myClassIds = myEnrolls.map((e: Enrollment) => e.class_id);
+
+    const myActiveClasses = myEnrolls
+      .filter((e: Enrollment) => e.status === 'Paid')
+      .map((e: Enrollment) => e.classes)
+      .filter(Boolean); // Filter out any undefined classes
+
+    return (
+        <>
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <h1 className="text-2xl font-bold mb-8">Portal Pelajar: <span className="text-emerald-600">{user.name}</span></h1>
+                
+                {/* JADUAL SECTION */}
+                <div className="mb-12">
+                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calendar size={20} className="text-emerald-600"/> Jadual Kelas (Lunas)</h2>
+                     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        {myActiveClasses.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400">Tiada kelas aktif (yuran lunas). Sila jelaskan yuran untuk melihat jadual.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 divide-y">
+                                {myActiveClasses.map((cls: ClassSession) => (
+                                    <div key={cls.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between hover:bg-gray-50 transition">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-emerald-100 p-3 rounded-full text-emerald-700">
+                                                <Clock size={20}/>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-gray-900">{cls.title}</h4>
+                                                <p className="text-sm text-emerald-700 mb-1 font-semibold flex items-center gap-1"><User size={12}/> {cls.instructor_name}</p>
+                                                <p className="text-sm text-gray-600 flex items-center gap-2">
+                                                    <span className="font-medium text-emerald-600">{cls.schedule || "Masa belum ditetapkan"}</span>
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900">{cls.title}</h4>
-                                            <p className="text-sm text-emerald-700 mb-1 font-semibold flex items-center gap-1"><User size={12}/> {cls.instructorName}</p>
-                                            <p className="text-sm text-gray-600 flex items-center gap-2">
-                                                <span className="font-medium text-emerald-600">{cls.schedule || "Masa belum ditetapkan"}</span>
-                                            </p>
+                                        <div className="mt-4 md:mt-0">
+                                            <a href={cls.google_meet_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
+                                                <Video size={16}/> Link Google Meet
+                                            </a>
                                         </div>
                                     </div>
-                                    <div className="mt-4 md:mt-0">
-                                        <a href={cls.googleMeetLink} target="_blank" className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
-                                            <Video size={16}/> Link Google Meet
-                                        </a>
+                                ))}
+                            </div>
+                        )}
+                     </div>
+                </div>
+
+                <div className="mb-12">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Senarai Kelas Ditawarkan</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {classes.map((cls: ClassSession) => {
+                            const enrolled = myClassIds.includes(cls.id);
+                            return (
+                                <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition">
+                                    <h3 className="font-bold text-lg mb-2">{cls.title}</h3>
+                                    <p className="text-sm text-emerald-700 mb-2 flex items-center gap-1 font-semibold"><User size={14}/> {cls.instructor_name || "Pengajar: Admin"}</p>
+                                    <div className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Calendar size={12}/> {cls.schedule || "Jadual belum ada"}</div>
+                                    <div className="flex justify-between items-end mb-4">
+                                         <p className="text-emerald-600 font-bold text-xl">RM {cls.price}</p>
+                                         <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{cls.type}</span>
                                     </div>
+                                    <p className="text-sm text-gray-500 mb-4 line-clamp-2">{cls.description}</p>
+                                    {enrolled ? (
+                                        <button disabled className="w-full bg-gray-100 text-gray-400 py-2 rounded font-medium cursor-not-allowed border border-gray-200">Telah Daftar</button>
+                                    ) : (
+                                        <button onClick={() => onEnroll(cls.id)} className="w-full bg-emerald-600 text-white py-2 rounded font-medium hover:bg-emerald-700 transition shadow-sm">Daftar Sekarang</button>
+                                    )}
                                 </div>
-                            ))}
+                            )
+                        })}
+                    </div>
+                </div>
+
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Inbox size={20} className="text-emerald-600"/> Status Yuran</h2>
+                <div className="space-y-4">
+                    {myEnrolls.length === 0 && (
+                        <div className="p-8 text-center bg-gray-50 border border-dashed rounded-xl text-gray-500">
+                            Anda belum mendaftar sebarang kelas.
                         </div>
                     )}
-                 </div>
-            </div>
-
-            <div className="mb-12">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><BookOpen size={20} className="text-emerald-600"/> Senarai Kelas Ditawarkan</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {classes.map((cls: ClassSession) => {
-                        const enrolled = myClassIds.includes(cls.id);
+                    {myEnrolls.map((e: Enrollment) => {
+                        const cls = e.classes;
+                        if(!cls) return null;
                         return (
-                            <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition">
-                                <h3 className="font-bold text-lg mb-2">{cls.title}</h3>
-                                <p className="text-sm text-emerald-700 mb-2 flex items-center gap-1 font-semibold"><User size={14}/> {cls.instructorName || "Pengajar: Admin"}</p>
-                                <div className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Calendar size={12}/> {cls.schedule || "Jadual belum ada"}</div>
-                                <div className="flex justify-between items-end mb-4">
-                                     <p className="text-emerald-600 font-bold text-xl">RM {cls.price}</p>
-                                     <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{cls.type}</span>
+                            <div key={e.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div>
+                                    <h4 className="font-bold text-lg">{cls.title}</h4>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-xs px-2 py-1 rounded font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                            {e.status === 'Paid' ? 'Lunas' : 'Belum Bayar'}
+                                        </span>
+                                        <span className="text-sm text-gray-500">ID: {e.id.substring(0,8)}...</span>
+                                    </div>
                                 </div>
-                                <p className="text-sm text-gray-500 mb-4 line-clamp-2">{cls.description}</p>
-                                {enrolled ? (
-                                    <button disabled className="w-full bg-gray-100 text-gray-400 py-2 rounded font-medium cursor-not-allowed border border-gray-200">Telah Daftar</button>
+                                {e.status === 'Paid' ? (
+                                    <a href={cls.google_meet_link} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium transition shadow-sm">
+                                        <Video size={18} /> Masuk Google Meet
+                                    </a>
                                 ) : (
-                                    <button onClick={() => onEnroll(cls.id)} className="w-full bg-emerald-600 text-white py-2 rounded font-medium hover:bg-emerald-700 transition shadow-sm">Daftar Sekarang</button>
+                                    <button onClick={() => handleOpenPaymentModal(e)} className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 font-medium transition shadow-sm animate-pulse">
+                                        <CreditCard size={18} /> Bayar Yuran
+                                    </button>
                                 )}
                             </div>
                         )
                     })}
                 </div>
             </div>
-
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Inbox size={20} className="text-emerald-600"/> Status Yuran</h2>
-            <div className="space-y-4">
-                {myEnrolls.length === 0 && (
-                    <div className="p-8 text-center bg-gray-50 border border-dashed rounded-xl text-gray-500">
-                        Anda belum mendaftar sebarang kelas.
-                    </div>
-                )}
-                {myEnrolls.map((e: Enrollment) => {
-                    const cls = classes.find((c: ClassSession) => c.id === e.classId);
-                    if(!cls) return null;
-                    return (
-                        <div key={e.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div>
-                                <h4 className="font-bold text-lg">{cls.title}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className={`text-xs px-2 py-1 rounded font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                        {e.status === 'Paid' ? 'Lunas' : 'Belum Bayar'}
-                                    </span>
-                                    <span className="text-sm text-gray-500">ID: {e.id.substring(0,8)}...</span>
-                                </div>
-                            </div>
-                            {e.status === 'Paid' ? (
-                                <a href={cls.googleMeetLink} target="_blank" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium transition shadow-sm">
-                                    <Video size={18} /> Masuk Google Meet
-                                </a>
-                            ) : (
-                                <button onClick={() => onPay(e.id)} className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 font-medium transition shadow-sm animate-pulse">
-                                    <CreditCard size={18} /> Bayar Yuran
-                                </button>
-                            )}
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
+            <PaymentModal 
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                enrollment={selectedEnrollment}
+                onConfirmPayment={onPay}
+                isLoading={loading}
+            />
+        </>
     )
 };
 
 const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
-    // Exact match for reliability using ID
-    const myClasses = classes.filter((c:any) => c.instructorId === user.id);
+    const myClasses = classes.filter((c:any) => c.instructor_id === user.id);
+    const myClassIds = myClasses.map((c:any) => c.id);
+    const myStudentsEnrollments = enrollments.filter((e:any) => myClassIds.includes(e.class_id));
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -615,7 +628,7 @@ const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
 
                 {/* Students List */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Users size={20} className="text-emerald-600"/> Senarai Pelajar</h3>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Users size={20} className="text-emerald-600"/> Senarai Pelajar Anda</h3>
                     <div className="overflow-y-auto max-h-[400px]">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0">
@@ -626,26 +639,22 @@ const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {enrollments.map((e: any) => {
-                                    // Filter students enrolled in MY classes
-                                    const cls = myClasses.find((c:any) => c.id === e.classId);
-                                    if (!cls) return null; // Skip if not my class
-
-                                    // Find student details
-                                    const student = users?.find((u:any) => u.id === e.userId);
+                                {myStudentsEnrollments.map((e: Enrollment) => {
+                                    const student = e.profiles;
+                                    const cls = e.classes;
 
                                     return (
                                         <tr key={e.id} className="border-b">
                                             <td className="p-3">
                                                 <div className="font-bold text-gray-900">{student ? student.name : 'Nama Tidak Dijumpai'}</div>
-                                                <div className="text-xs text-gray-400 font-mono mb-1">{e.userId.substring(0,8)}...</div>
+                                                <div className="text-xs text-gray-400 font-mono mb-1">{e.user_id.substring(0,8)}...</div>
                                                 {student?.phone && (
                                                     <div className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
                                                         <Phone size={10} /> {student.phone}
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="p-3 align-top pt-3">{cls.title}</td>
+                                            <td className="p-3 align-top pt-3">{cls?.title}</td>
                                             <td className="p-3 text-center align-top pt-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                     {e.status}
@@ -653,8 +662,8 @@ const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
                                             </td>
                                         </tr>
                                     )
-                                }).filter(Boolean)}
-                                {enrollments.filter((e:any) => myClasses.some((c:any) => c.id === e.classId)).length === 0 && 
+                                })}
+                                {myStudentsEnrollments.length === 0 && 
                                     <tr><td colSpan={3} className="p-4 text-center text-gray-500">Tiada pelajar berdaftar dalam kelas anda.</td></tr>}
                             </tbody>
                         </table>
@@ -668,12 +677,10 @@ const InstructorDashboard = ({ user, classes, enrollments, users }: any) => {
 const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPayment }: { classes: ClassSession[], users: Profile[], enrollments: Enrollment[], onCreateClass: (data: any) => void, onVerifyPayment: (id: string) => void }) => {
     const [activeTab, setActiveTab] = useState<'classes' | 'orders'>('classes');
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '', instructorId: '' });
+    const [formData, setFormData] = useState({ title: '', price: '', google_meet_link: '', description: '', schedule: '', instructor_name: '', instructor_id: '' });
 
-    // Filter available instructors
     const instructors = users.filter(u => u.role === 'ustaz');
 
-    // Schedule Generator State
     const [useAutoSchedule, setUseAutoSchedule] = useState(false);
     const [startDay, setStartDay] = useState('');
     const [startTime, setStartTime] = useState('');
@@ -689,14 +696,12 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
 
         for (let i = 0; i < 4; i++) {
             const day = String(currentDate.getDate()).padStart(2, '0');
-            const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
             dates.push(`${day}/${month}`);
             
-            // Add 7 days
             currentDate.setDate(currentDate.getDate() + 7);
         }
 
-        // Convert 24hr time to 12hr format for display
         let [hours, minutes] = startTime.split(':');
         let modifier = +hours >= 12 ? 'PM' : 'AM';
         let hrs = +hours % 12 || 12;
@@ -710,7 +715,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
         e.preventDefault();
         onCreateClass(formData);
         setShowForm(false);
-        setFormData({ title: '', price: '', link: '', description: '', schedule: '', instructorName: '', instructorId: '' });
+        setFormData({ title: '', price: '', google_meet_link: '', description: '', schedule: '', instructor_name: '', instructor_id: '' });
         setUseAutoSchedule(false);
         setStartDay('');
         setStartTime('');
@@ -723,14 +728,14 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
         if (selectedInstructor) {
             setFormData({
                 ...formData,
-                instructorId: selectedInstructor.id,
-                instructorName: selectedInstructor.name
+                instructor_id: selectedInstructor.id,
+                instructor_name: selectedInstructor.name
             });
         } else {
              setFormData({
                 ...formData,
-                instructorId: '',
-                instructorName: ''
+                instructor_id: '',
+                instructor_name: ''
             });
         }
     };
@@ -772,7 +777,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                     <div className="relative">
                                         <select 
                                             className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white cursor-pointer" 
-                                            value={formData.instructorId} 
+                                            value={formData.instructor_id} 
                                             onChange={handleInstructorChange}
                                             required
                                         >
@@ -786,7 +791,6 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                     {instructors.length === 0 && <p className="text-xs text-red-500 mt-1">Tiada akaun Ustaz dijumpai. Sila pastikan role 'ustaz' telah ditetapkan di database.</p>}
                                 </div>
 
-                                {/* Jadual Section */}
                                 <div className="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="block text-sm font-bold">Jadual / Masa</label>
@@ -795,7 +799,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                         </button>
                                     </div>
 
-                                    {useAutoSchedule ? (
+                                    {useAutoSchedule && (
                                         <div className="grid grid-cols-2 gap-4 mb-2 animate-fade-in-up">
                                             <div>
                                                 <label className="text-xs text-gray-500">Tarikh Mula</label>
@@ -809,7 +813,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                                 Jana Tarikh
                                             </button>
                                         </div>
-                                    ) : null}
+                                    )}
 
                                     <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Setiap Jumaat, 9:00 PM" value={formData.schedule} onChange={e=>setFormData({...formData, schedule: e.target.value})} required/>
                                 </div>
@@ -820,7 +824,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                 </div>
                                 <div>
                                      <label className="block text-sm font-medium mb-1">Google Meet Link</label>
-                                     <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.link} onChange={e=>setFormData({...formData, link: e.target.value})}/>
+                                     <input className="border w-full p-2 rounded focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="https://meet.google.com/..." value={formData.google_meet_link} onChange={e=>setFormData({...formData, google_meet_link: e.target.value})}/>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium mb-1">Penerangan</label>
@@ -846,10 +850,10 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                 {classes.length === 0 && (
                                     <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada rekod kelas.</td></tr>
                                 )}
-                                {classes.map((c: any) => (
+                                {classes.map((c: ClassSession) => (
                                     <tr key={c.id} className="border-b hover:bg-gray-50">
                                         <td className="p-4 font-medium">{c.title}</td>
-                                        <td className="p-4 text-gray-500"><User size={14} className="inline mr-1"/>{c.instructorName || "-"}</td>
+                                        <td className="p-4 text-gray-500"><User size={14} className="inline mr-1"/>{c.instructor_name || "-"}</td>
                                         <td className="p-4 text-gray-500 text-sm">{c.schedule}</td>
                                         <td className="p-4 text-emerald-600 font-bold">RM {c.price}</td>
                                         <td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase">Aktif</span></td>
@@ -880,9 +884,9 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
                                 {enrollments.length === 0 && (
                                     <tr><td colSpan={5} className="p-8 text-center text-gray-400">Tiada tempahan direkodkan.</td></tr>
                                 )}
-                                {enrollments.map((e: any) => {
-                                    const student = users.find(u => u.id === e.userId);
-                                    const cls = classes.find(c => c.id === e.classId);
+                                {enrollments.map((e: Enrollment) => {
+                                    const student = e.profiles;
+                                    const cls = e.classes;
                                     
                                     return (
                                         <tr key={e.id} className="border-b hover:bg-gray-50">
@@ -936,115 +940,173 @@ const App = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Initial Load
-  useEffect(() => {
-    // 1. Get Logged In User
-    const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (storedUser) {
-        setUser(JSON.parse(storedUser));
-    }
-
-    // 2. Load Data from LocalStorage
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    // Simulate slight delay to feel like an "app"
-    setTimeout(() => {
-        setClasses(db.get(STORAGE_KEYS.CLASSES, []));
-        setEnrollments(db.get(STORAGE_KEYS.ENROLLMENTS, []));
-        setUsers(db.get(STORAGE_KEYS.USERS, []));
-        setLoading(false);
-    }, 500);
-  };
+    try {
+        const { data: classesData, error: classesError } = await supabase.from('classes').select('*').order('created_at', { ascending: false });
+        if(classesError) throw classesError;
+        setClasses(classesData as ClassSession[]);
 
-  const handleCreateClass = (data: any) => {
+        // For admin/ustaz, we need more data
+        if(user) {
+             const { data: enrollmentsData, error: enrollmentsError } = await supabase
+                .from('enrollments')
+                .select('*, classes(*), profiles(*)')
+                .order('created_at', { ascending: false });
+             if(enrollmentsError) throw enrollmentsError;
+             setEnrollments(enrollmentsData as Enrollment[]);
+        }
+
+        // Only admin should fetch all users
+        if(user?.role === 'admin') {
+            const { data: usersData, error: usersError } = await supabase.from('profiles').select('*');
+            if (usersError) throw usersError;
+            setUsers(usersData as Profile[]);
+        }
+
+    } catch (error: any) {
+        console.error("Error fetching data:", error);
+        alert("Gagal memuatkan data: " + error.message);
+    } finally {
+        setLoading(false);
+    }
+  }, [user]);
+
+  // Handle Auth changes and fetch initial data
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user;
+      if (currentUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+        setUser(profile as Profile);
+      } else {
+        setUser(null);
+      }
+    });
+
+    // Fetch public classes on initial load
+    fetchData();
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [fetchData]);
+
+  // Real-time subscriptions
+  useEffect(() => {
+    const classChannel = supabase.channel('public:classes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, payload => {
+        console.log('Class change received!', payload);
+        fetchData(); // Refetch all data on change
+      })
+      .subscribe();
+      
+    const enrollmentChannel = supabase.channel('public:enrollments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, payload => {
+        console.log('Enrollment change received!', payload);
+        fetchData(); // Refetch all data on change
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(classChannel);
+        supabase.removeChannel(enrollmentChannel);
+    };
+  }, [fetchData]);
+
+
+  const handleCreateClass = async (data: Omit<ClassSession, 'id' | 'is_active' | 'type'>) => {
       setLoading(true);
-      setTimeout(() => {
-          const newClass = {
-              id: crypto.randomUUID(),
+      try {
+          const { error } = await supabase.from('classes').insert({
               ...data,
-              isActive: true,
-              type: 'monthly' // default
-          };
-          const updatedClasses = [newClass, ...classes];
-          db.set(STORAGE_KEYS.CLASSES, updatedClasses);
-          setClasses(updatedClasses);
-          setLoading(false);
+              price: Number(data.price) // ensure price is number
+          });
+          if (error) throw error;
           alert("Kelas berjaya ditambah!");
-      }, 500);
+      } catch (error: any) {
+          alert("Gagal menambah kelas: " + error.message);
+      } finally {
+          setLoading(false);
+      }
   }
 
-  const handleEnroll = (classId: string) => {
+  const handleEnroll = async (classId: string) => {
       if(!user) return setIsAuthOpen(true);
       
-      const currentEnrollments = db.get(STORAGE_KEYS.ENROLLMENTS, []);
-      const exists = currentEnrollments.find((e: any) => e.userId === user.id && e.classId === classId);
-      
+      const exists = enrollments.find(e => e.user_id === user.id && e.class_id === classId);
       if (exists) {
           alert("Anda sudah mendaftar untuk kelas ini.");
           return;
       }
-
+      
       setLoading(true);
-      setTimeout(() => {
-          const newEnroll = {
-              id: crypto.randomUUID(),
-              userId: user.id,
-              classId: classId,
+      try {
+          const { error } = await supabase.from('enrollments').insert({
+              user_id: user.id,
+              class_id: classId,
               status: 'Unpaid'
-          };
-          const updated = [newEnroll, ...currentEnrollments];
-          db.set(STORAGE_KEYS.ENROLLMENTS, updated);
-          setEnrollments(updated);
+          });
+          if (error) throw error;
+          alert("Berjaya daftar! Sila buat pembayaran di tab 'Status Yuran'.");
+      } catch (error: any) {
+          alert("Gagal mendaftar: " + error.message);
+      } finally {
           setLoading(false);
-          alert("Berjaya daftar! Sila buat pembayaran di tab Kelas Saya.");
-      }, 500);
-  }
-
-  const handlePay = (enrollId: string) => {
-      if(confirm("Sahkan pembayaran manual (Demo)?\nKlik OK untuk menandakan sebagai 'Paid'.")) {
-          setLoading(true);
-          setTimeout(() => {
-             const updated = enrollments.map(e => e.id === enrollId ? {...e, status: 'Paid'} : e);
-             db.set(STORAGE_KEYS.ENROLLMENTS, updated);
-             setEnrollments(updated as Enrollment[]);
-             setLoading(false);
-             alert("Pembayaran berjaya direkodkan!");
-          }, 500);
       }
   }
 
-  const handleAdminVerifyPayment = (enrollId: string) => {
+  const handlePay = async (enrollId: string) => {
+      setLoading(true);
+      try {
+          const { error } = await supabase.from('enrollments').update({ status: 'Paid' }).eq('id', enrollId);
+          if (error) {
+              throw error;
+          }
+          alert("Pembayaran berjaya direkodkan!");
+      } catch (error: any) {
+          alert("Gagal merekod pembayaran: " + error.message);
+          throw error; // Re-throw the error to be caught by the caller
+      } finally {
+          setLoading(false);
+      }
+  }
+
+  const handleAdminVerifyPayment = async (enrollId: string) => {
       if(confirm("Adakah anda pasti mahu mengesahkan pembayaran ini secara manual?")) {
           setLoading(true);
-          setTimeout(() => {
-             const updated = enrollments.map(e => e.id === enrollId ? {...e, status: 'Paid'} : e);
-             db.set(STORAGE_KEYS.ENROLLMENTS, updated);
-             setEnrollments(updated as Enrollment[]);
-             setLoading(false);
-             alert("Status berjaya dikemaskini ke 'Paid'.");
-          }, 500);
+          try {
+              const { error } = await supabase.from('enrollments').update({ status: 'Paid' }).eq('id', enrollId);
+              if (error) throw error;
+              alert("Status berjaya dikemaskini ke 'Paid'.");
+          } catch (error: any) {
+              alert("Gagal mengesahkan: " + error.message);
+          } finally {
+              setLoading(false);
+          }
       }
   }
   
-  const handleLogout = () => {
+  const handleLogout = async () => {
+      await supabase.auth.signOut();
       setUser(null);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      window.location.href = '/';
+      // No need for full page reload anymore
   }
 
   const renderDashboard = () => {
       if (!user) return <LandingPage classes={classes} onOpenAuth={() => setIsAuthOpen(true)} />;
       
-      const role = user.role ? String(user.role).toLowerCase().trim() : 'student';
+      const role = user.role || 'student';
       
       if (role === 'admin') return <AdminDashboard classes={classes} users={users} enrollments={enrollments} onCreateClass={handleCreateClass} onVerifyPayment={handleAdminVerifyPayment} />;
       if (role === 'ustaz') return <InstructorDashboard user={user} classes={classes} enrollments={enrollments} users={users} />;
-      if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} />;
+      if (role === 'student') return <StudentPortal user={user} classes={classes} enrollments={enrollments} onEnroll={handleEnroll} onPay={handlePay} loading={loading} />;
       
-      return <div>Error Role</div>;
+      return <div>Error: Peranan pengguna tidak diketahui.</div>;
   }
 
   return (
@@ -1053,16 +1115,15 @@ const App = () => {
       
       {loading && <div className="fixed top-20 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg flex gap-3 items-center z-[100] animate-bounce"><Loader2 className="animate-spin" size={20}/> Memproses data...</div>}
 
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLogin={setUser} />
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLoginSuccess={fetchData} />
 
       {renderDashboard()}
     
-      {/* Footer */}
       <div className="text-center py-10 bg-slate-100 text-gray-500 text-sm mt-auto">
          <div className="max-w-7xl mx-auto px-4">
             <p className="font-semibold text-emerald-900 mb-2">CelikKalam Digital</p>
             <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara.</p>
-            <p className="text-xs text-gray-400 mt-2">Mode: Client-Side Demo (Tiada Backend)</p>
+            <p className="text-xs text-gray-400 mt-2">Dikuasakan oleh Supabase</p>
          </div>
       </div>
     </div>
