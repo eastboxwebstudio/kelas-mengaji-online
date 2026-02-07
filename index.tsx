@@ -984,8 +984,8 @@ const App = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
         const { data: classesData, error: classesError } = await supabase.from('classes').select('*').order('created_at', { ascending: false });
         if(classesError) throw classesError;
@@ -1012,11 +1012,11 @@ const App = () => {
         console.error("Error fetching data:", error);
         alert("Gagal memuatkan data: " + error.message);
     } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
     }
   }, [user]);
 
-  // Handle Auth changes and fetch initial data
+  // Handle Auth changes
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user;
@@ -1032,27 +1032,29 @@ const App = () => {
       }
     });
 
-    // Fetch public classes on initial load
-    fetchData();
-
     return () => {
       authListener?.subscription.unsubscribe();
     };
+  }, []); // Remove dependency on fetchData to avoid loops
+
+  // Fetch data when user changes or on mount
+  useEffect(() => {
+    fetchData(); 
   }, [fetchData]);
 
-  // Real-time subscriptions
+  // Real-time subscriptions (Silent updates)
   useEffect(() => {
     const classChannel = supabase.channel('public:classes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, payload => {
         console.log('Class change received!', payload);
-        fetchData(); // Refetch all data on change
+        fetchData(true); // Silent update
       })
       .subscribe();
       
     const enrollmentChannel = supabase.channel('public:enrollments')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, payload => {
         console.log('Enrollment change received!', payload);
-        fetchData(); // Refetch all data on change
+        fetchData(true); // Silent update
       })
       .subscribe();
 
@@ -1159,7 +1161,7 @@ const App = () => {
       
       {loading && <div className="fixed top-20 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg flex gap-3 items-center z-[100] animate-bounce"><Loader2 className="animate-spin" size={20}/> Memproses data...</div>}
 
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLoginSuccess={fetchData} />
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLoginSuccess={() => fetchData()} />
 
       {renderDashboard()}
     
