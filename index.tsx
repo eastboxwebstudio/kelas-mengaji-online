@@ -7,8 +7,19 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // --- SUPABASE CLIENT SETUP ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Safe access to environment variables with fallback
+const getEnvVar = (key: string, fallback: string) => {
+  try {
+    // @ts-ignore
+    return import.meta.env?.[key] || fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', "https://ghnzubqlxzqfrvnzvhaj.supabase.co");
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdobnp1YnFseHpxZnJ2bnp2aGFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MTM2MjAsImV4cCI6MjA4NTk4OTYyMH0.qWHmjTseGdrNOMrx3KvXF0_eiK2n_WmoZixtdgIjEuc");
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- Types ---
