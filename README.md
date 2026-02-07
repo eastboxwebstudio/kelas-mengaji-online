@@ -1,30 +1,33 @@
 # CelikKalam - Aplikasi Kelas Mengaji (Client-Side)
 
-Aplikasi ini kini berjalan sepenuhnya di browser menggunakan **LocalStorage**.
+Aplikasi ini kini berjalan sepenuhnya di browser menggunakan **LocalStorage**. 
+Tiada backend, tiada database, tiada server error.
 
-Tiada backend, tiada database server, tiada API error.
+## 🚀 Cara Deploy (Penting!)
 
-## 🚀 Cara Run
+Kerana kita sudah buang backend, sila guna arahan ini dengan tepat:
 
-1. **Install Dependencies:**
+1. **Install:**
    ```bash
    npm install
    ```
 
-2. **Run Local:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Deploy:**
+2. **Build Project:**
    ```bash
    npm run build
-   npx wrangler pages deploy
    ```
 
-## 🔐 Akaun Demo
-App ini akan auto-generate akaun bila pertama kali buka:
+3. **Deploy ke Cloudflare Pages:**
+   ```bash
+   npx wrangler pages deploy dist
+   ```
+   *(Pilih "Create a new project" jika ditanya, dan namakan projek ini `celikkalam`)*
 
+## 💻 Cara Run Local
+```bash
+npm run dev
+```
+
+## 🔐 Akaun Demo
 - **Admin:** `admin@test.com` / `admin`
 - **Ustaz:** `ustaz@test.com` / `ustaz`
-- **Student:** Boleh register sendiri akaun baru.
