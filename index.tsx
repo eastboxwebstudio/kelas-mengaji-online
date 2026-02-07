@@ -987,12 +987,31 @@ const App = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user;
       if (currentUser) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .single();
-        setUser(profile as Profile);
+        // We handle the potential race condition where auth exists but profile is being created
+        try {
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentUser.id)
+              .maybeSingle(); // Use maybeSingle to avoid 406 error if row doesn't exist yet
+            
+            if (error) {
+                console.error("Error fetching profile:", error);
+                return;
+            }
+            
+            if (profile) {
+                setUser(profile as Profile);
+            } else {
+                console.log("Profile not found yet (might be created by trigger).");
+                // Optionally retry or just wait for next update? 
+                // For now, set null to prevent UI issues
+                setUser(null);
+            }
+        } catch(e) {
+            console.error(e);
+            setUser(null);
+        }
       } else {
         setUser(null);
       }
