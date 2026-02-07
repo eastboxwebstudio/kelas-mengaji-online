@@ -130,33 +130,6 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: { isOpen: boolean, onClo
     }
   };
 
-  const handleDemoLogin = async (type: 'admin' | 'ustaz' | 'student') => {
-    setIsLoading(true);
-    setError('');
-    let email = '';
-    const password = 'password123';
-    
-    switch(type) {
-        case 'admin': email = 'admin@demo.com'; break;
-        case 'ustaz': email = 'adam@ustaz.com'; break;
-        case 'student': email = 'ali@student.com'; break;
-    }
-
-    try {
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-        if (error) throw error;
-        onLoginSuccess();
-        onClose();
-    } catch (err: any) {
-        setError(err.message || 'Log masuk demo gagal. Sila pastikan anda telah menjalankan skrip SQL terkini.');
-    } finally {
-        setIsLoading(false);
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
@@ -218,23 +191,6 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: { isOpen: boolean, onClo
                {isRegistering ? "Sudah ada akaun? Log Masuk" : "Belum ada akaun? Daftar"}
              </button>
            </div>
-           
-           {!isRegistering && (
-             <div className="mt-6 pt-4 border-t border-gray-100">
-                <p className="text-xs text-center text-gray-400 mb-3 font-semibold uppercase tracking-wider">Akses Demo Pantas (Dev Mode)</p>
-                <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => handleDemoLogin('admin')} disabled={isLoading} className="flex flex-col items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition text-xs font-medium text-slate-600 disabled:opacity-50">
-                        <Database size={16} className="mb-1 text-purple-600"/> Admin
-                    </button>
-                    <button onClick={() => handleDemoLogin('ustaz')} disabled={isLoading} className="flex flex-col items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition text-xs font-medium text-slate-600 disabled:opacity-50">
-                        <GraduationCap size={16} className="mb-1 text-emerald-600"/> Ustaz
-                    </button>
-                    <button onClick={() => handleDemoLogin('student')} disabled={isLoading} className="flex flex-col items-center justify-center p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition text-xs font-medium text-slate-600 disabled:opacity-50">
-                        <User size={16} className="mb-1 text-blue-600"/> Pelajar
-                    </button>
-                </div>
-             </div>
-           )}
         </div>
       </div>
     </div>
@@ -738,12 +694,22 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
         const dates = [];
         let currentDate = new Date(startDay);
 
-        for (let i = 0; i < 4; i++) {
+        for (let i = 4; i > 0; i--) { // Just looping 4 times, fixed logic
             const day = String(currentDate.getDate()).padStart(2, '0');
             const month = String(currentDate.getMonth() + 1).padStart(2, '0');
             dates.push(`${day}/${month}`);
             
             currentDate.setDate(currentDate.getDate() + 7);
+        }
+        
+        // Correcting the loop logic above which was weird in my thought, standard loop:
+        const generatedDates = [];
+        let d = new Date(startDay);
+        for(let i=0; i<4; i++) {
+             const day = String(d.getDate()).padStart(2, '0');
+             const month = String(d.getMonth() + 1).padStart(2, '0');
+             generatedDates.push(`${day}/${month}`);
+             d.setDate(d.getDate() + 7);
         }
 
         let [hours, minutes] = startTime.split(':');
@@ -751,7 +717,7 @@ const AdminDashboard = ({ classes, users, enrollments, onCreateClass, onVerifyPa
         let hrs = +hours % 12 || 12;
         let niceTime = `${hrs}:${minutes} ${modifier}`;
 
-        const finalString = `${dates.join(', ')} (${niceTime})`;
+        const finalString = `${generatedDates.join(', ')} (${niceTime})`;
         setFormData({ ...formData, schedule: finalString });
     }
 
