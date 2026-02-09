@@ -7,14 +7,19 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // --- SUPABASE CLIENT SETUP ---
-// Safe access to environment variables with fallback
+// Safe access to environment variables with defensive fallback
 const getEnvVar = (key: string, fallback: string) => {
   try {
+    // Manual check to prevent "Cannot read properties of undefined"
     // @ts-ignore
-    return import.meta.env?.[key] || fallback;
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      return import.meta.env[key] || fallback;
+    }
   } catch (e) {
-    return fallback;
+    console.warn("Env read error, using fallback for:", key);
   }
+  return fallback;
 };
 
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', "https://ghnzubqlxzqfrvnzvhaj.supabase.co");
@@ -1134,9 +1139,17 @@ const App = () => {
   }
   
   const handleLogout = async () => {
-      await supabase.auth.signOut();
-      setUser(null);
-      // No need for full page reload anymore
+      try {
+          await supabase.auth.signOut();
+      } catch (error) {
+          console.error("Logout error:", error);
+      } finally {
+          setUser(null);
+          setEnrollments([]);
+          setUsers([]);
+          // Force a reload to clear any lingering Supabase client state or subscription listeners
+          window.location.href = '/'; 
+      }
   }
 
   const renderDashboard = () => {
