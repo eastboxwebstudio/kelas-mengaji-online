@@ -968,34 +968,44 @@ const App = () => {
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    
+    // Fetch Classes (Public)
     try {
         const { data: classesData, error: classesError } = await supabase.from('classes').select('*').order('created_at', { ascending: false });
         if(classesError) throw classesError;
         setClasses(classesData as ClassSession[]);
+    } catch (error: any) {
+        console.error("Error fetching classes:", error);
+    }
 
-        // For admin/ustaz, we need more data
-        if(user) {
+    // Authenticated Fetches
+    if(user) {
+        // Fetch Enrollments (User/Admin)
+        try {
              const { data: enrollmentsData, error: enrollmentsError } = await supabase
                 .from('enrollments')
                 .select('*, classes(*), profiles(*)')
                 .order('created_at', { ascending: false });
              if(enrollmentsError) throw enrollmentsError;
              setEnrollments(enrollmentsData as Enrollment[]);
+        } catch (error: any) {
+            console.error("Error fetching enrollments:", error);
         }
 
-        // Only admin should fetch all users
-        if(user?.role === 'admin') {
-            const { data: usersData, error: usersError } = await supabase.from('profiles').select('*');
-            if (usersError) throw usersError;
-            setUsers(usersData as Profile[]);
+        // Fetch Users (Admin Only)
+        if(user.role === 'admin') {
+            try {
+                const { data: usersData, error: usersError } = await supabase.from('profiles').select('*');
+                if (usersError) throw usersError;
+                setUsers(usersData as Profile[]);
+            } catch (error: any) {
+                console.error("Error fetching users (Admin):", error);
+                // Don't alert here to avoid blocking other data if RLS fails initially
+            }
         }
-
-    } catch (error: any) {
-        console.error("Error fetching data:", error);
-        alert("Gagal memuatkan data: " + error.message);
-    } finally {
-        if (!silent) setLoading(false);
     }
+    
+    if (!silent) setLoading(false);
   }, [user]);
 
   // Handle Auth changes

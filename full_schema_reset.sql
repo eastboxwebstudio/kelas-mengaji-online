@@ -4,6 +4,7 @@
 -- 1. BERSIHKAN DATABASE (DROP ALL)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS public.is_admin(); -- Drop is_admin if exists
 DROP TABLE IF EXISTS public.enrollments;
 DROP TABLE IF EXISTS public.classes;
 DROP TABLE IF EXISTS public.profiles;
@@ -26,10 +27,27 @@ CREATE TABLE public.profiles (
   role public.user_role NOT NULL DEFAULT 'student'
 );
 
+-- Function: is_admin (Safe check)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'admin'
+  );
+$$;
+
 -- RLS for Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own profile." ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile." ON public.profiles FOR UPDATE USING (auth.uid() = id);
+-- Admin access for Profiles
+CREATE POLICY "Admins can view all profiles." ON public.profiles FOR SELECT USING (is_admin());
 
 -- Function to handle new user signup automatically
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -72,7 +90,7 @@ CREATE TABLE public.classes (
 -- RLS for Classes
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can view active classes." ON public.classes FOR SELECT USING (is_active = true);
-CREATE POLICY "Admins can do anything with classes." ON public.classes FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Admins can do anything with classes." ON public.classes FOR ALL USING (is_admin()) WITH CHECK (is_admin());
 
 -- Create Enrollments Table
 CREATE TABLE public.enrollments (
@@ -87,7 +105,7 @@ CREATE TABLE public.enrollments (
 ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own enrollments." ON public.enrollments FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can create their own enrollments." ON public.enrollments FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Admins can do anything with enrollments." ON public.enrollments FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Admins can do anything with enrollments." ON public.enrollments FOR ALL USING (is_admin()) WITH CHECK (is_admin());
 
 -- Grant permissions (Fix for 'Database error querying schema')
 GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;

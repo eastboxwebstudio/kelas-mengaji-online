@@ -11,6 +11,22 @@ create table public.profiles (
   role public.user_role not null default 'student'
 );
 
+-- 2.1 Helper function to check if user is admin (SECURITY DEFINER prevents RLS recursion)
+-- This allows policies to safely check admin status without triggering profile RLS loops.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+    and role = 'admin'
+  );
+$$;
+
 -- 3. Set up Row Level Security (RLS) for Profiles
 alter table public.profiles enable row level security;
 
@@ -21,6 +37,11 @@ create policy "Users can view their own profile."
 create policy "Users can update their own profile."
   on public.profiles for update
   using ( auth.uid() = id );
+
+-- NEW: Allow Admins to view all profiles (Critical for Admin Dashboard)
+create policy "Admins can view all profiles."
+  on public.profiles for select
+  using ( is_admin() );
   
 -- This function is called when a new user signs up.
 -- It creates a corresponding row in the public.profiles table.
@@ -66,8 +87,8 @@ create policy "Anyone can view active classes."
 
 create policy "Admins can do anything with classes."
   on public.classes for all
-  using ( (select role from profiles where id = auth.uid()) = 'admin' )
-  with check ( (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( is_admin() )
+  with check ( is_admin() );
   
 -- 6. Create Enrollments Table
 create table public.enrollments (
@@ -91,8 +112,8 @@ create policy "Users can create their own enrollments."
 
 create policy "Admins can do anything with enrollments."
   on public.enrollments for all
-  using ( (select role from profiles where id = auth.uid()) = 'admin' )
-  with check ( (select role from profiles where id = auth.uid()) = 'admin' );
+  using ( is_admin() )
+  with check ( is_admin() );
 
 -- 8. Seed Default Ustaz and Admin Roles (Optional, run after you register them)
 -- First, register 'admin@test.com' and 'ustaz@test.com' through the app UI.
