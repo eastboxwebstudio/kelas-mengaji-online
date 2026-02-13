@@ -441,7 +441,7 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
                     >
                         {isLoading ? (
                             <>
-                                <Loader2 className="animate-spin" /> Mengubungi Gateway...
+                                <Loader2 className="animate-spin" /> Menghubungi Gateway...
                             </>
                         ) : (
                             <>
@@ -1071,7 +1071,15 @@ const App = () => {
         .then(res => res.json())
         .then((data: any) => {
             if (data.success) {
-                alert("Alhamdulillah! Pembayaran telah disahkan.");
+                // Check if user is logged in. If redirect happened across domains, user might be null.
+                const isLoggedOut = !supabase.auth.getUser(); // Simple check or rely on user state
+                
+                if (isLoggedOut && !user) {
+                   alert("Alhamdulillah! Pembayaran telah disahkan. Sila log masuk semula untuk melihat status terkini.");
+                } else {
+                   alert("Alhamdulillah! Pembayaran telah disahkan. Status anda telah dikemaskini.");
+                }
+                
                 fetchData(true); // refresh data
             } else {
                 alert("Pembayaran belum disahkan atau gagal. Sila hubungi admin jika anda telah membuat bayaran.");
@@ -1085,7 +1093,7 @@ const App = () => {
             setPaymentVerifying(false);
         });
     }
-  }, [fetchData]);
+  }, [fetchData, user]); // Added user dependency to check login status correctly
 
   // Real-time subscriptions
   useEffect(() => {

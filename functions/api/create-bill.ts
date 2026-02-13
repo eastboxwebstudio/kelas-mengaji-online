@@ -1,6 +1,7 @@
 interface Env {
   TOYYIBPAY_SECRET_KEY: string;
   TOYYIBPAY_CATEGORY_CODE: string;
+  APP_URL?: string; // Optional: Force a specific domain (e.g., https://celikkalam.my)
 }
 
 // Fix: Removed missing PagesFunction type and used any for context to avoid type errors
@@ -25,9 +26,21 @@ export const onRequestPost = async (context: any) => {
     // ToyyibPay uses price in CENTS (RM1 = 100)
     const priceInCents = Math.round(parseFloat(price) * 100);
     
+    // --- DOMAIN LOGIC ---
+    // 1. Use APP_URL from Environment Variable if set (Best for Production: https://celikkalam.my)
+    // 2. Fallback to request.url (Good for Dev/Preview branches)
+    let origin = "";
+    
+    if (env.APP_URL) {
+      // Remove trailing slash if present to avoid double slashes
+      origin = env.APP_URL.replace(/\/$/, "");
+    } else {
+      const urlObj = new URL(request.url);
+      origin = urlObj.origin;
+    }
+
     // Construct Return URL (Where ToyyibPay redirects back to)
-    const url = new URL(request.url);
-    const returnUrl = `${url.protocol}//${url.host}/?payment_verify=true&enrollment_id=${enrollmentId}`;
+    const returnUrl = `${origin}/?payment_verify=true&enrollment_id=${enrollmentId}`;
 
     const formData = new FormData();
     formData.append('userSecretKey', env.TOYYIBPAY_SECRET_KEY);
@@ -38,7 +51,7 @@ export const onRequestPost = async (context: any) => {
     formData.append('billPayorInfo', '1');
     formData.append('billAmount', priceInCents.toString());
     formData.append('billReturnUrl', returnUrl);
-    formData.append('billCallbackUrl', returnUrl); // In production, use a dedicated backend callback URL
+    formData.append('billCallbackUrl', returnUrl); 
     formData.append('billTo', name);
     formData.append('billEmail', email);
     formData.append('billPhone', phone || '0123456789');

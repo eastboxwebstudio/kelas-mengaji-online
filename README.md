@@ -1,57 +1,78 @@
 # CelikKalam - Aplikasi Kelas Mengaji
 
-Aplikasi ini kini menggunakan **Supabase** sebagai backend untuk pangkalan data (PostgreSQL) dan pengesahan (authentication).
+Aplikasi ini menggunakan **Supabase** sebagai backend (PostgreSQL + Auth) dan **Cloudflare Pages Functions** sebagai serverless backend untuk integrasi pembayaran ToyyibPay.
 
 ## 🚀 Persediaan Awal (Setup)
 
 1.  **Cipta Projek Supabase:**
     *   Daftar dan cipta projek baru di [supabase.com](https://supabase.com).
 
-2.  **Konfigurasi Environment Variables:**
-    *   Cipta fail `.env` di direktori utama projek.
-    *   Salin API URL dan Anon Key dari Supabase Project Settings > API.
-    *   Tampal ke dalam fail `.env`:
-        ```
-        VITE_SUPABASE_URL="YOUR_SUPABASE_URL"
-        VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
-        ```
-
-3.  **Setup Pangkalan Data:**
+2.  **Setup Pangkalan Data:**
     *   Buka fail `schema.sql` dari projek ini.
     *   Pergi ke **SQL Editor** di dashboard Supabase anda.
-    *   Tampal keseluruhan kandungan `schema.sql` dan klik **Run**. Ini akan mencipta semua jadual dan polisi keselamatan yang diperlukan.
+    *   Tampal keseluruhan kandungan `schema.sql` dan klik **Run**.
 
-4.  **Pasang Dependencies:**
+3.  **Pasang Dependencies:**
     ```bash
     npm install
     ```
 
+## 🔐 Konfigurasi Environment Variables (PENTING)
+
+Untuk memastikan fungsi pembayaran dan database berjalan, anda perlu menetapkan variable berikut.
+
+### 1. Di Fail `.env` (Local Development - Frontend)
+Cipta fail `.env`:
+```bash
+VITE_SUPABASE_URL="https://your-project.supabase.co"
+VITE_SUPABASE_ANON_KEY="your-anon-key"
+```
+
+### 2. Di Cloudflare Pages Dashboard (Production - Backend)
+Pergi ke **Settings > Environment variables** di projek Cloudflare Pages anda dan tambah:
+
+| Variable Name | Description | Where to find |
+| :--- | :--- | :--- |
+| `VITE_SUPABASE_URL` | URL Projek Supabase | Supabase Settings > API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Key Admin (Bypass RLS) | Supabase Settings > API (Service Role) |
+| `TOYYIBPAY_SECRET_KEY` | Secret Key ToyyibPay | ToyyibPay Dashboard |
+| `TOYYIBPAY_CATEGORY_CODE` | Category Code ToyyibPay | ToyyibPay Dashboard (Create Category) |
+| `APP_URL` | **(Optional)** URL Domain Utama | Set kepada `https://celikkalam.my` |
+
+> **Amaran:** Jangan sesekali dedahkan `SUPABASE_SERVICE_ROLE_KEY` di dalam kod frontend atau fail `.env` yang dipush ke GitHub. Ia hanya untuk environment server (Cloudflare).
+
 ## 💻 Cara Run Local
+
+### Frontend Sahaja (Tanpa Fungsi Bayaran)
 ```bash
 npm run dev
 ```
+*Nota: Fungsi `handlePay` akan gagal kerana folder `functions/` tidak dijalankan oleh Vite.*
+
+### Full Stack (Frontend + Backend Functions)
+Anda perlu install `wrangler` terlebih dahulu:
+```bash
+npm install -g wrangler
+```
+Kemudian jalankan:
+```bash
+npx wrangler pages dev . -- npm run dev
+```
+Ini membolehkan anda test API `/api/create-bill` secara local.
+
+## 🚀 Deployment
+
+1.  Push kod ke GitHub.
+2.  Sambungkan repo ke Cloudflare Pages.
+3.  Set **Build Command**: `npm run build`
+4.  Set **Output Directory**: `dist`
+5.  Masukkan Environment Variables seperti di atas.
+6.  Deploy!
 
 ## 🔐 Akaun Demo
 
-Selepas setup, anda perlu mendaftar akaun baru melalui antaramuka aplikasi. Untuk menetapkan peranan (role) sebagai `admin` atau `ustaz`:
-
-1.  Daftar akaun 'admin@test.com' dan 'ustaz@test.com' (atau emel pilihan anda) melalui aplikasi. Peranan mereka akan jadi 'student' secara lalai.
-2.  Pergi ke SQL Editor di Supabase dan jalankan query ini untuk menaik taraf peranan mereka:
-    ```sql
-    -- Gantikan emel dengan yang anda daftarkan
-    UPDATE public.profiles SET role = 'admin' WHERE email = 'admin@test.com';
-    UPDATE public.profiles SET role = 'ustaz' WHERE email = 'ustaz@test.com';
-    ```
-
-## 🚀 Cara Deploy ke Cloudflare Pages
-
-1.  Pastikan kod anda berada di repositori GitHub.
-2.  Di Cloudflare, cipta projek **Pages** dan sambungkan ke repo anda.
-3.  **Konfigurasi Build:**
-    *   **Framework Preset:** `Vite`
-    *   **Build Command:** `npm run build`
-    *   **Build Output Directory:** `dist`
-4.  **Tambah Environment Variables:**
-    *   Pergi ke Settings > Environment variables di projek Pages anda.
-    *   Tambah `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` dengan nilai dari Supabase.
-5.  Deploy.
+Selepas setup, daftar akaun dan jalankan SQL ini di Supabase untuk set admin:
+```sql
+UPDATE public.profiles SET role = 'admin' WHERE email = 'admin@test.com';
+UPDATE public.profiles SET role = 'ustaz' WHERE email = 'ustaz@test.com';
+```
