@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { 
   BookOpen, User, LogOut, CheckCircle, XCircle, Loader2, Inbox, Plus, CreditCard, Video, GraduationCap, ArrowRight,
-  Database, AlertCircle, RefreshCw, Users, Calendar, Clock, Eye, EyeOff, Wand2, Check, ChevronDown, Phone, ClipboardList
+  Database, AlertCircle, RefreshCw, Users, Calendar, Clock, Eye, EyeOff, Wand2, Check, ChevronDown, Phone, ClipboardList, ShieldCheck
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -56,6 +56,7 @@ interface Enrollment {
   user_id: string;
   class_id: string;
   status: 'Unpaid' | 'Paid';
+  bill_code?: string;
   classes?: ClassSession; // For joining data
   profiles?: Profile; // For joining data
 }
@@ -392,7 +393,7 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
     isOpen: boolean, 
     onClose: () => void, 
     enrollment: Enrollment | null, 
-    onConfirmPayment: (id: string) => Promise<void>, 
+    onConfirmPayment: (enrollment: Enrollment) => Promise<void>, 
     isLoading: boolean 
 }) => {
     if (!isOpen || !enrollment) return null;
@@ -401,12 +402,10 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
 
     const handleConfirm = async () => {
         try {
-            await onConfirmPayment(enrollment.id);
-            onClose(); // Close modal only on successful payment
+            await onConfirmPayment(enrollment);
+            // Modal close handled by parent or navigation
         } catch (error) {
-            console.error("Payment failed:", error);
-            // Error is already alerted by the handler, no need to alert again.
-            // Modal remains open for user to retry.
+            console.error("Payment initiation failed:", error);
         }
     }
 
@@ -415,7 +414,7 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative overflow-hidden animate-fade-in-up">
                 <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><CreditCard size={22} className="text-emerald-600"/> Pengesahan Pembayaran</h2>
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><CreditCard size={22} className="text-emerald-600"/> Pembayaran Dalam Talian</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-800"><XCircle/></button>
                 </div>
                 <div className="p-8 space-y-6">
@@ -431,16 +430,8 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
                         </div>
                     </div>
 
-                    <div>
-                        <h3 className="font-semibold text-gray-500 text-sm uppercase tracking-wider">Maklumat Pembayaran (Simulasi)</h3>
-                        <div className="mt-2 space-y-4">
-                            <input type="text" placeholder="Nama Penuh Pada Kad" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" defaultValue={enrollment.profiles?.name} />
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <input type="text" placeholder="XXXX XXXX XXXX XXXX" className="sm:col-span-3 w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
-                                <input type="text" placeholder="MM/YY" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
-                                <input type="text" placeholder="CVC" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" />
-                            </div>
-                        </div>
+                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg text-sm text-emerald-800">
+                        <p className="flex gap-2"><ShieldCheck size={18}/> Anda akan dibawa ke portal pembayaran selamat <strong>ToyyibPay</strong> (FPX Online Banking) untuk melengkapkan transaksi.</p>
                     </div>
                     
                     <button 
@@ -450,15 +441,18 @@ const PaymentModal = ({ isOpen, onClose, enrollment, onConfirmPayment, isLoading
                     >
                         {isLoading ? (
                             <>
-                                <Loader2 className="animate-spin" /> Memproses...
+                                <Loader2 className="animate-spin" /> Mengubungi Gateway...
                             </>
                         ) : (
                             <>
-                                <CheckCircle size={18}/> Sahkan Pembayaran
+                                <CreditCard size={18}/> Bayar dengan FPX
                             </>
                         )}
                     </button>
-                    <p className="text-xs text-center text-gray-400">Ini adalah simulasi. Tiada caj sebenar akan dikenakan.</p>
+                    <div className="flex justify-center gap-2 opacity-60">
+                         {/* Placeholder icons for banks if needed */}
+                         <span className="text-xs text-gray-400">Powered by ToyyibPay</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -471,7 +465,7 @@ const StudentPortal = ({ user, classes, enrollments, onEnroll, onPay, loading }:
     classes: ClassSession[];
     enrollments: Enrollment[];
     onEnroll: (classId: string) => void;
-    onPay: (enrollId: string) => Promise<void>;
+    onPay: (enrollment: Enrollment) => Promise<void>;
     loading: boolean;
 }) => {
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -965,6 +959,7 @@ const App = () => {
   const [users, setUsers] = useState<Profile[]>([]); 
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [paymentVerifying, setPaymentVerifying] = useState(false);
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1013,13 +1008,12 @@ const App = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user;
       if (currentUser) {
-        // We handle the potential race condition where auth exists but profile is being created
         try {
             const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', currentUser.id)
-              .maybeSingle(); // Use maybeSingle to avoid 406 error if row doesn't exist yet
+              .maybeSingle(); 
             
             if (error) {
                 console.error("Error fetching profile:", error);
@@ -1029,9 +1023,6 @@ const App = () => {
             if (profile) {
                 setUser(profile as Profile);
             } else {
-                console.log("Profile not found yet (might be created by trigger).");
-                // Optionally retry or just wait for next update? 
-                // For now, set null to prevent UI issues
                 setUser(null);
             }
         } catch(e) {
@@ -1046,26 +1037,69 @@ const App = () => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []); // Remove dependency on fetchData to avoid loops
+  }, []);
 
-  // Fetch data when user changes or on mount
+  // Fetch data when user changes
   useEffect(() => {
     fetchData(); 
   }, [fetchData]);
 
-  // Real-time subscriptions (Silent updates)
+  // Check for Payment Return URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const verifyParam = urlParams.get('payment_verify');
+    const billCode = urlParams.get('billcode');
+    const enrollmentId = urlParams.get('enrollment_id');
+    const statusId = urlParams.get('status_id');
+
+    if (verifyParam && billCode && enrollmentId) {
+        // Clear URL to prevent re-triggering on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        if (statusId === '3') {
+            alert('Pembayaran tidak berjaya.');
+            return;
+        }
+
+        setPaymentVerifying(true);
+        // Call backend verification
+        fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ billCode, enrollmentId })
+        })
+        .then(res => res.json())
+        .then((data: any) => {
+            if (data.success) {
+                alert("Alhamdulillah! Pembayaran telah disahkan.");
+                fetchData(true); // refresh data
+            } else {
+                alert("Pembayaran belum disahkan atau gagal. Sila hubungi admin jika anda telah membuat bayaran.");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Ralat semasa mengesahkan pembayaran.");
+        })
+        .finally(() => {
+            setPaymentVerifying(false);
+        });
+    }
+  }, [fetchData]);
+
+  // Real-time subscriptions
   useEffect(() => {
     const classChannel = supabase.channel('public:classes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, payload => {
         console.log('Class change received!', payload);
-        fetchData(true); // Silent update
+        fetchData(true);
       })
       .subscribe();
       
     const enrollmentChannel = supabase.channel('public:enrollments')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, payload => {
         console.log('Enrollment change received!', payload);
-        fetchData(true); // Silent update
+        fetchData(true);
       })
       .subscribe();
 
@@ -1081,7 +1115,7 @@ const App = () => {
       try {
           const { error } = await supabase.from('classes').insert({
               ...data,
-              price: Number(data.price) // ensure price is number
+              price: Number(data.price) 
           });
           if (error) throw error;
           alert("Kelas berjaya ditambah!");
@@ -1110,6 +1144,8 @@ const App = () => {
           });
           if (error) throw error;
           alert("Berjaya daftar! Sila buat pembayaran di tab 'Status Yuran'.");
+          // Optionally auto-open payment modal here by updating logic, but keeping it simple for now
+          fetchData(true);
       } catch (error: any) {
           alert("Gagal mendaftar: " + error.message);
       } finally {
@@ -1117,17 +1153,45 @@ const App = () => {
       }
   }
 
-  const handlePay = async (enrollId: string) => {
+  // UPDATED: Handle Payment via Server-side Proxy
+  const handlePay = async (enrollment: Enrollment) => {
+      if (!user) return;
       setLoading(true);
+      
       try {
-          const { error } = await supabase.from('enrollments').update({ status: 'Paid' }).eq('id', enrollId);
-          if (error) {
-              throw error;
+          const cls = enrollment.classes;
+          if (!cls) throw new Error("Kelas tidak dijumpai");
+
+          // Call Cloudflare Function (Backend Proxy)
+          const res = await fetch('/api/create-bill', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  enrollmentId: enrollment.id,
+                  name: user.name,
+                  email: user.email,
+                  phone: user.phone,
+                  title: cls.title,
+                  price: cls.price
+              })
+          });
+
+          const data = await res.json() as any;
+
+          if (!res.ok) throw new Error(data.error || "Gagal menghubungi server pembayaran");
+          
+          if (data.billCode) {
+              // Redirect to ToyyibPay
+              window.location.href = `https://toyyibpay.com/${data.billCode}`;
+          } else {
+              throw new Error("Bill Code tidak diterima.");
           }
-          alert("Pembayaran berjaya direkodkan!");
+
       } catch (error: any) {
-          alert("Gagal merekod pembayaran: " + error.message);
-          throw error; // Re-throw the error to be caught by the caller
+          console.error(error);
+          alert("Gagal memulakan pembayaran: " + error.message);
       } finally {
           setLoading(false);
       }
@@ -1157,7 +1221,6 @@ const App = () => {
           setUser(null);
           setEnrollments([]);
           setUsers([]);
-          // Force a reload to clear any lingering Supabase client state or subscription listeners
           window.location.href = '/'; 
       }
   }
@@ -1179,6 +1242,14 @@ const App = () => {
       <Navbar user={user} onOpenAuth={() => setIsAuthOpen(true)} onLogout={handleLogout} />
       
       {loading && <div className="fixed top-20 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg flex gap-3 items-center z-[100] animate-bounce"><Loader2 className="animate-spin" size={20}/> Memproses data...</div>}
+      
+      {paymentVerifying && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center text-white">
+            <Loader2 className="animate-spin mb-4" size={48} />
+            <h2 className="text-xl font-bold">Mengesahkan Pembayaran...</h2>
+            <p className="text-gray-400">Sila tunggu sebentar.</p>
+        </div>
+      )}
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLoginSuccess={() => fetchData()} />
 
@@ -1188,7 +1259,7 @@ const App = () => {
          <div className="max-w-7xl mx-auto px-4">
             <p className="font-semibold text-emerald-900 mb-2">CelikKalam Digital</p>
             <p className="text-xs">&copy; {new Date().getFullYear()} Hak Cipta Terpelihara.</p>
-            <p className="text-xs text-gray-400 mt-2">Dikuasakan oleh Supabase</p>
+            <p className="text-xs text-gray-400 mt-2">Dikuasakan oleh Supabase & ToyyibPay</p>
          </div>
       </div>
     </div>

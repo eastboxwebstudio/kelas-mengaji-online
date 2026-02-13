@@ -96,7 +96,8 @@ create table public.enrollments (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   user_id uuid references public.profiles(id) not null,
   class_id uuid references public.classes(id) not null,
-  status text default 'Unpaid' not null -- Unpaid, Paid
+  status text default 'Unpaid' not null, -- Unpaid, Paid
+  bill_code text -- ToyyibPay Bill Code
 );
 
 -- 7. Set up RLS for Enrollments
@@ -110,20 +111,15 @@ create policy "Users can create their own enrollments."
   on public.enrollments for insert
   with check ( auth.uid() = user_id );
 
+-- Allow users to update their own enrollment (needed if we want client-side updates, though verify-payment uses service role)
+-- but good to have if we want to add features later like 'Cancel'
+create policy "Users can update their own enrollments"
+  on public.enrollments for update
+  using ( auth.uid() = user_id );
+
 create policy "Admins can do anything with enrollments."
   on public.enrollments for all
   using ( is_admin() )
   with check ( is_admin() );
 
--- 8. Seed Default Ustaz and Admin Roles (Optional, run after you register them)
--- First, register 'admin@test.com' and 'ustaz@test.com' through the app UI.
--- Then, run these UPDATE queries in the SQL editor to change their roles.
--- Replace the emails with the actual emails you registered.
-
--- UPDATE public.profiles
--- SET role = 'admin'
--- WHERE email = 'admin@test.com';
-
--- UPDATE public.profiles
--- SET role = 'ustaz'
--- WHERE email = 'ustaz@test.com';
+-- 8. Seed Default Ustaz and Admin Roles (Optional)
